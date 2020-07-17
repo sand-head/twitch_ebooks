@@ -8,6 +8,7 @@ namespace TwitchEbooks.Database
 {
     public class TwitchEbooksContextFactory : IDesignTimeDbContextFactory<TwitchEbooksContext>
     {
+        public TwitchEbooksContext CreateDbContext() => CreateDbContext(new string[] { });
         public TwitchEbooksContext CreateDbContext(string[] args)
         {
             var configuration = new ConfigurationBuilder()

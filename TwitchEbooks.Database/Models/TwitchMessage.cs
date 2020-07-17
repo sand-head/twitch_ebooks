@@ -4,7 +4,7 @@ namespace TwitchEbooks.Database.Models
 {
     public class TwitchMessage
     {
-        public Guid MessageId { get; set; }
+        public Guid Id { get; set; }
         public uint ChannelId { get; set; }
         public uint UserId { get; set; }
         public string Message { get; set; }

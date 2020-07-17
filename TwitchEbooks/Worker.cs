@@ -3,8 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using TwitchEbooks.Database;
+using TwitchEbooks.Database.Models;
+using TwitchEbooks.Infrastructure;
 
 namespace TwitchEbooks
 {
@@ -12,18 +16,37 @@ namespace TwitchEbooks
     {
         private readonly ILogger<Worker> _logger;
 
-        public Worker(ILogger<Worker> logger)
+        public Worker(ILogger<Worker> logger, IServiceProvider services)
         {
             _logger = logger;
+            Services = services;
         }
+
+        public IServiceProvider Services { get; }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            while (!stoppingToken.IsCancellationRequested)
+            var twitchService = Services.GetService<TwitchService>();
+            var msgGenService = Services.GetService<MessageGenerationService>();
+
+            var tokens = GetLatestTokens();
+            if (tokens == null)
             {
-                _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
-                await Task.Delay(1000, stoppingToken);
+                _logger.LogInformation("No access tokens were found in the database, pulling up the web server...");
+                // todo: load web server and do authy things
             }
+
+            await twitchService.ConnectAsync(tokens);
+            // todo: hook the TwitchService up with the MessageGenerationService
+
+            // todo: execute until stop
+        }
+
+        private UserAccessToken GetLatestTokens()
+        {
+            using var scope = Services.CreateScope();
+            var context = scope.ServiceProvider.GetService<TwitchEbooksContext>();
+            return context.AccessTokens.OrderByDescending(a => a.CreatedOn).FirstOrDefault();
         }
     }
 }
