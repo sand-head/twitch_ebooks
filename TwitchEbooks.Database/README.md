@@ -1,0 +1,2 @@
+﻿# Migrations
+When migrating, use `dotnet ef migrations add (migration-name) --project TwitchEbooks.Database --startup-project TwitchEbooks` to ensure both the startup and database projects are located.

@@ -21,10 +21,7 @@
 
   <ItemGroup>
     <PackageReference Include="Anybotty.StreamClientLibrary" Version="2020.5.24.2" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="3.1.6">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="3.1.6" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="3.1.6" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="3.1.6" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="3.1.4" />

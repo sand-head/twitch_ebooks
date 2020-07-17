@@ -10,7 +10,7 @@ using TwitchEbooks.Database;
 namespace TwitchEbooks.Database.Migrations
 {
     [DbContext(typeof(TwitchEbooksContext))]
-    [Migration("20200716220915_InitialMigration")]
+    [Migration("20200717044044_InitialMigration")]
     partial class InitialMigration
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
