@@ -27,4 +27,5 @@ LABEL traefik.http.routers.twitch-ebooks.rule="Host(`robo.schweigert.dev`)"
 LABEL traefik.http.routers.twitch-ebooks.tls=true
 LABEL traefik.http.routers.twitch-ebooks.tls.certresolver="le"
 LABEL traefik.http.routers.twitch-ebooks.tls.domains[0].main="robo.schweigert.dev"
+EXPOSE 80
 ENTRYPOINT ["dotnet", "TwitchEbooks.dll"]
