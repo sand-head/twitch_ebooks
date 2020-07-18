@@ -61,6 +61,7 @@ namespace TwitchEbooks
                     services.AddHttpClient<TwitchApiClient>();
 
                     services.AddSingleton(hostContext.Configuration.GetSection("Twitch").Get<TwitchSettings>());
+                    services.AddSingleton<AuthCodeFlowWebServerFactory>();
                     services.AddSingleton<TwitchService>();
                     services.AddSingleton<MessageGenerationPool>();
 
