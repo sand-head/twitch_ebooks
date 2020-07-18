@@ -22,4 +22,9 @@ RUN dotnet publish "TwitchEbooks.csproj" -c Release -o /app/publish
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+LABEL traefik.enable=true
+LABEL traefik.http.routers.twitch-ebooks.rule="Host(`robo.schweigert.dev`)"
+LABEL traefik.http.routers.twitch-ebooks.tls=true
+LABEL traefik.http.routers.twitch-ebooks.tls.certresolver="le"
+LABEL traefik.http.routers.twitch-ebooks.tls.domains[0].main="robo.justinhasa.website"
 ENTRYPOINT ["dotnet", "TwitchEbooks.dll"]
