@@ -29,7 +29,7 @@ namespace TwitchEbooks.Infrastructure
             _client = new TwitchClient(apiClient);
             _client.Log += _logger.LogInformation;
             _client.Connected += TwitchClient_Connected;
-            _client.MessageReceived += TwitchClient_MessageReceived;
+            _client.MessageReceived += async (msg) => await TwitchClient_MessageReceived(msg);
             _userTokens = null;
             _channelName = null;
         }
@@ -38,6 +38,7 @@ namespace TwitchEbooks.Infrastructure
         public event EventHandler<TokensRefreshedEventArgs> OnTokensRefreshed;
         public event EventHandler<GenerationRequestReceivedEventArgs> OnGenerationRequestReceived;
         public event EventHandler<ChatMessageReceivedEventArgs> OnChatMessageReceived;
+        public event EventHandler<BotJoinLeaveReceivedEventArgs> OnBotJoinLeaveReceivedEventArgs;
 
         public async Task ConnectAsync(UserAccessToken tokens)
         {
@@ -79,23 +80,49 @@ namespace TwitchEbooks.Infrastructure
             $"https://id.twitch.tv/oauth2/authorize?client_id={WebUtility.UrlEncode(_twitchSettings.ClientId)}"
                 + $"&redirect_uri={WebUtility.UrlEncode(_twitchSettings.RedirectUri)}&response_type=code&scope={WebUtility.UrlEncode(string.Join(' ', scopes))}";
 
-        private void HandleChatMessage(ChatMessage message)
+        public async Task SendMessageAsync(string channelName, string message)
         {
-            if (message.Message.StartsWith("~generate"))
-            {
-                _logger.LogInformation("Generation request received for channel {ChannelId}.", message.RoomId);
-                OnGenerationRequestReceived?.Invoke(this, new GenerationRequestReceivedEventArgs
-                {
-                    ChannelId = message.RoomId,
-                    ChannelName = message.ChannelName
-                });
-                return;
-            }
+            await _client.SendMessageAsync(channelName, message);
+        }
 
-            OnChatMessageReceived?.Invoke(this, new ChatMessageReceivedEventArgs
+        private async Task HandleBotCommandsAsync(ChatMessage message)
+        {
+            if (message.Message.StartsWith("~join"))
             {
-                Message = message
-            });
+                if (_client.JoinedChannels.Contains(message.Username))
+                {
+                    await SendMessageAsync(_channelName, $"@{message.Username} I'm already in your chat, so I can't join again.");
+                    return;
+                }
+
+                _client.JoinChannel(message.Username);
+                await SendMessageAsync(_channelName, $"@{message.Username} Successfully joined your chat!");
+                OnBotJoinLeaveReceivedEventArgs?.Invoke(this, new BotJoinLeaveReceivedEventArgs
+                {
+                    RequestedPresence = BotPresenceRequest.Join,
+                    ChannelId = message.UserId,
+                    ChannelName = message.Username,
+                    BotChannelName = _channelName
+                });
+            }
+            else if (message.Message.StartsWith("~leave"))
+            {
+                if (!_client.JoinedChannels.Contains(message.Username))
+                {
+                    await SendMessageAsync(_channelName, $"@{message.Username} I'm not currently in your chat, so I can't leave.");
+                    return;
+                }
+
+                _client.LeaveChannel(message.Username);
+                await SendMessageAsync(_channelName, $"@{message.Username} Successfully left your chat!");
+                OnBotJoinLeaveReceivedEventArgs?.Invoke(this, new BotJoinLeaveReceivedEventArgs
+                {
+                    RequestedPresence = BotPresenceRequest.Leave,
+                    ChannelId = message.UserId,
+                    ChannelName = message.Username,
+                    BotChannelName = _channelName
+                });
+            }
         }
 
         private void TwitchClient_Connected()
@@ -105,15 +132,30 @@ namespace TwitchEbooks.Infrastructure
             _client.JoinChannel(_channelName);
         }
 
-        private void TwitchClient_MessageReceived(StreamMessage message)
+        private async Task TwitchClient_MessageReceived(StreamMessage message)
         {
             if (message is ChatMessage chatMessage)
             {
                 if (chatMessage.RoomId == _userTokens.UserId)
+                    await HandleBotCommandsAsync(chatMessage);
+                else
                 {
-                    // do specific commands for the main channel (like ~join) here
+                    if (chatMessage.Message.StartsWith("~generate"))
+                    {
+                        _logger.LogInformation("Generation request received for channel {ChannelId}.", chatMessage.RoomId);
+                        OnGenerationRequestReceived?.Invoke(this, new GenerationRequestReceivedEventArgs
+                        {
+                            ChannelId = chatMessage.RoomId,
+                            ChannelName = chatMessage.ChannelName
+                        });
+                        return;
+                    }
+
+                    OnChatMessageReceived?.Invoke(this, new ChatMessageReceivedEventArgs
+                    {
+                        Message = chatMessage
+                    });
                 }
-                else HandleChatMessage(chatMessage);
             }
             // todo: maybe do a fun generation when receiving a gift sub?
         }

@@ -1,16 +1,15 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
-using Anybotty.StreamClientLibrary.Twitch;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using TwitchEbooks.Database;
 using TwitchEbooks.Database.Models;
 using TwitchEbooks.Infrastructure;
+using TwitchEbooks.Models.Events;
 
 namespace TwitchEbooks
 {
@@ -30,6 +29,8 @@ namespace TwitchEbooks
         {
             var twitchService = Services.GetService<TwitchService>();
             var msgGenService = Services.GetService<MessageGenerationService>();
+
+            await msgGenService.StartAsync(stoppingToken);
 
             var tokens = GetLatestTokens();
             if (tokens == null)
@@ -53,9 +54,14 @@ namespace TwitchEbooks
                 SaveTokens(tokens);
             }
 
-            // todo: hook the TwitchService up with the MessageGenerationService
+            // passing the services like this feels wrong, maybe just make them private properties?
+            // that doesn't strike me as great either though
             twitchService.OnTokensRefreshed += (_, e) => SaveTokens(e.NewTokens);
             twitchService.OnConnected += async (_, e) => await TwitchService_OnConnected(twitchService);
+            twitchService.OnBotJoinLeaveReceivedEventArgs += (_, e) => TwitchService_OnBotJoinLeaveReceivedEventArgs(e, msgGenService);
+            twitchService.OnChatMessageReceived += msgGenService.LoadChatMessage;
+            twitchService.OnGenerationRequestReceived += async (_, e) => await TwitchService_OnGenerationRequestReceived(e, twitchService, msgGenService);
+            twitchService.OnGenerationRequestReceived += async (_, e) => await TwitchService_OnGenerationRequestReceived(e, twitchService, msgGenService);
             await twitchService.ConnectAsync(tokens);
             // todo: execute until stop? or do we already do that?
         }
@@ -73,6 +79,7 @@ namespace TwitchEbooks
             var context = scope.ServiceProvider.GetService<TwitchEbooksContext>();
             context.AccessTokens.Add(tokens);
             context.SaveChanges();
+            _logger.LogInformation("New access tokens saved.");
         }
 
         private async Task TwitchService_OnConnected(TwitchService twitchService)
@@ -84,6 +91,20 @@ namespace TwitchEbooks
             {
                 await twitchService.JoinChannelByIdAsync(channel.Id);
             }
+        }
+
+        private void TwitchService_OnBotJoinLeaveReceivedEventArgs(BotJoinLeaveReceivedEventArgs e, MessageGenerationService msgGenService)
+        {
+            if (e.RequestedPresence == BotPresenceRequest.Join)
+                msgGenService.TryAddPool(e.ChannelId);
+            else if (e.RequestedPresence == BotPresenceRequest.Leave)
+                msgGenService.TryRemovePool(e.ChannelId);
+        }
+
+        private async Task TwitchService_OnGenerationRequestReceived(GenerationRequestReceivedEventArgs e, TwitchService twitchService, MessageGenerationService msgGenService)
+        {
+            var message = msgGenService.GenerateMessage(e.ChannelId);
+            await twitchService.SendMessageAsync(e.ChannelName, message ?? "You gotta say stuff in chat before I can generate a message!");
         }
     }
 }
