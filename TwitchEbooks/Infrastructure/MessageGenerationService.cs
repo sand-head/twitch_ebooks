@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Anybotty.StreamClientLibrary.Common.Models.Messages;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
@@ -70,7 +71,7 @@ namespace TwitchEbooks.Infrastructure
             return true;
         }
 
-        public void LoadChatMessage(object sender, ChatMessageReceivedEventArgs e)
+        public void LoadChatMessage(object sender, MessageReceivedEventArgs<ChatMessage> e)
         {
             // this is only meant to be used by the TwitchService
             if (!_channelPools.TryGetValue(e.Message.RoomId, out var pool)) return;

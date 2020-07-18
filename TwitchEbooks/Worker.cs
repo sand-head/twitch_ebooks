@@ -1,3 +1,4 @@
+using Anybotty.StreamClientLibrary.Common.Models.Messages;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -61,7 +62,7 @@ namespace TwitchEbooks
             twitchService.OnBotJoinLeaveReceivedEventArgs += (_, e) => TwitchService_OnBotJoinLeaveReceivedEventArgs(e, msgGenService);
             twitchService.OnChatMessageReceived += msgGenService.LoadChatMessage;
             twitchService.OnGenerationRequestReceived += async (_, e) => await TwitchService_OnGenerationRequestReceived(e, twitchService, msgGenService);
-            twitchService.OnGenerationRequestReceived += async (_, e) => await TwitchService_OnGenerationRequestReceived(e, twitchService, msgGenService);
+            twitchService.OnChatMessageDeleted += TwitchService_OnChatMessageDeleted;
             await twitchService.ConnectAsync(tokens);
             // todo: execute until stop? or do we already do that?
         }
@@ -105,6 +106,20 @@ namespace TwitchEbooks
         {
             var message = msgGenService.GenerateMessage(e.ChannelId);
             await twitchService.SendMessageAsync(e.ChannelName, message ?? "You gotta say stuff in chat before I can generate a message!");
+        }
+
+        private void TwitchService_OnChatMessageDeleted(object sender, MessageReceivedEventArgs<ClearMessage> e)
+        {
+            using var scope = Services.CreateScope();
+            var context = scope.ServiceProvider.GetService<TwitchEbooksContext>();
+            var message = context.Messages.Find(e.Message.MessageId);
+            if (message != null)
+            {
+                // we don't actually have a way to remove a message in a Markov chain
+                // so for now at least we're just gonna rely on them being purged on program restart
+                context.Remove(message);
+                context.SaveChanges();
+            }
         }
     }
 }

@@ -37,7 +37,8 @@ namespace TwitchEbooks.Infrastructure
         public event EventHandler OnConnected;
         public event EventHandler<TokensRefreshedEventArgs> OnTokensRefreshed;
         public event EventHandler<GenerationRequestReceivedEventArgs> OnGenerationRequestReceived;
-        public event EventHandler<ChatMessageReceivedEventArgs> OnChatMessageReceived;
+        public event EventHandler<MessageReceivedEventArgs<ChatMessage>> OnChatMessageReceived;
+        public event EventHandler<MessageReceivedEventArgs<ClearMessage>> OnChatMessageDeleted;
         public event EventHandler<BotJoinLeaveReceivedEventArgs> OnBotJoinLeaveReceivedEventArgs;
 
         public async Task ConnectAsync(UserAccessToken tokens)
@@ -151,11 +152,18 @@ namespace TwitchEbooks.Infrastructure
                         return;
                     }
 
-                    OnChatMessageReceived?.Invoke(this, new ChatMessageReceivedEventArgs
+                    OnChatMessageReceived?.Invoke(this, new MessageReceivedEventArgs<ChatMessage>
                     {
                         Message = chatMessage
                     });
                 }
+            }
+            else if (message is ClearMessage clearMessage)
+            {
+                OnChatMessageDeleted?.Invoke(this, new MessageReceivedEventArgs<ClearMessage>
+                {
+                    Message = clearMessage
+                });
             }
             // todo: maybe do a fun generation when receiving a gift sub?
         }
