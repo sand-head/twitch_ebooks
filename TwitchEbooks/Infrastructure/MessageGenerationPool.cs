@@ -9,7 +9,7 @@ namespace TwitchEbooks.Infrastructure
 
         public MessageGenerationPool()
         {
-            _chain = new MarkovChain<string>(2);
+            _chain = new MarkovChain<string>(1);
             LoadedMessages = 0;
         }
 

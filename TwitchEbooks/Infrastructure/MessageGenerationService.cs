@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
@@ -33,13 +34,15 @@ namespace TwitchEbooks.Infrastructure
             foreach (var channel in channels)
             {
                 _logger.LogInformation("Creating pool for channel {ChannelId}...", channel.Id);
+                var stopwatch = Stopwatch.StartNew();
                 var pool = new MessageGenerationPool();
                 foreach (var message in channel.Messages)
                 {
                     pool.LoadChatMessage(message);
                 }
                 _channelPools.Add(channel.Id, pool);
-                _logger.LogInformation("Pool for channel {ChannelId} created.", channel.Id);
+                stopwatch.Stop();
+                _logger.LogInformation("Pool for channel {ChannelId} created. ({Elapsed} ms)", channel.Id, stopwatch.ElapsedMilliseconds);
             }
         }
 
