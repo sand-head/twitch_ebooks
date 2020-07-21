@@ -16,10 +16,14 @@ namespace TwitchEbooks
     public class Worker : BackgroundService
     {
         private readonly ILogger<Worker> _logger;
+        private readonly TwitchService _twitchService;
+        private readonly MessageGenerationService _msgGenService;
 
-        public Worker(ILogger<Worker> logger, IServiceProvider services)
+        public Worker(ILogger<Worker> logger, TwitchService twitchService, MessageGenerationService msgGenService, IServiceProvider services)
         {
             _logger = logger;
+            _twitchService = twitchService;
+            _msgGenService = msgGenService;
             Services = services;
         }
 
@@ -27,10 +31,7 @@ namespace TwitchEbooks
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            var twitchService = Services.GetService<TwitchService>();
-            var msgGenService = Services.GetService<MessageGenerationService>();
-
-            await msgGenService.StartAsync(stoppingToken);
+            await _msgGenService.StartAsync(stoppingToken);
 
             var tokens = GetLatestTokens();
             if (tokens == null)
@@ -46,7 +47,7 @@ namespace TwitchEbooks
                         "chat:read"
                     };
 
-                    _logger.LogInformation("In order to connect to Twitch, we gotta do a fancy authentication handshake with them so that they'll give us some neat access tokens. To log in with Twitch, head on over to this URL:\n" + twitchService.BuildAuthCodeFlowUrl(scopes));
+                    _logger.LogInformation("In order to connect to Twitch, we gotta do a fancy authentication handshake with them so that they'll give us some neat access tokens. To log in with Twitch, head on over to this URL:\n" + _twitchService.BuildAuthCodeFlowUrl(scopes));
                     tokens = await server.RunUntilCompleteAsync(stoppingToken); // blocks until authentication is complete
                     _logger.LogInformation("Alrighty, tokens acquired! We'll go ahead and continue starting up now, thanks.");
                 }
@@ -54,17 +55,14 @@ namespace TwitchEbooks
                 SaveTokens(tokens);
             }
 
-            // passing the services like this feels wrong, maybe just make them private properties?
-            // that doesn't strike me as great either though
-            twitchService.OnTokensRefreshed += (s, e) => SaveTokens(e.NewTokens);
-            twitchService.OnConnected += async (s, e) => await TwitchService_OnConnected(twitchService);
-            twitchService.OnBotJoinLeaveReceivedEventArgs += (s, e) => TwitchService_OnBotJoinLeaveReceivedEventArgs(e, msgGenService);
-            twitchService.OnChatMessageReceived += msgGenService.LoadChatMessage;
-            twitchService.OnGenerationRequestReceived += async (s, e) => await TwitchService_OnGenerationRequestReceived(e, twitchService, msgGenService);
-            twitchService.OnChatMessageDeleted += TwitchService_OnChatMessageDeleted;
-            twitchService.OnGiftSubReceived += async (s, e) => await TwitchService_OnGiftSubReceived(twitchService, msgGenService, e);
-            await twitchService.ConnectAsync(tokens);
-            // todo: execute until stop? or do we already do that?
+            _twitchService.OnTokensRefreshed += (s, e) => SaveTokens(e.NewTokens);
+            _twitchService.OnConnected += async (s, e) => await TwitchService_OnConnected();
+            _twitchService.OnBotJoinLeaveReceivedEventArgs += (s, e) => TwitchService_OnBotJoinLeaveReceivedEventArgs(e);
+            _twitchService.OnChatMessageReceived += _msgGenService.LoadChatMessage;
+            _twitchService.OnGenerationRequestReceived += async (s, e) => await TwitchService_OnGenerationRequestReceived(e);
+            _twitchService.OnChatMessageDeleted += TwitchService_OnChatMessageDeleted;
+            _twitchService.OnGiftSubReceived += async (s, e) => await TwitchService_OnGiftSubReceived(e);
+            await _twitchService.ConnectAsync(tokens);
         }
 
         private UserAccessToken GetLatestTokens()
@@ -83,29 +81,29 @@ namespace TwitchEbooks
             _logger.LogInformation("New access tokens saved.");
         }
 
-        private async Task TwitchService_OnConnected(TwitchService twitchService)
+        private async Task TwitchService_OnConnected()
         {
             using var scope = Services.CreateScope();
             var context = scope.ServiceProvider.GetService<TwitchEbooksContext>();
 
             foreach (var channel in context.Channels)
             {
-                await twitchService.JoinChannelByIdAsync(channel.Id);
+                await _twitchService.JoinChannelByIdAsync(channel.Id);
             }
         }
 
-        private void TwitchService_OnBotJoinLeaveReceivedEventArgs(BotJoinLeaveReceivedEventArgs e, MessageGenerationService msgGenService)
+        private void TwitchService_OnBotJoinLeaveReceivedEventArgs(BotJoinLeaveReceivedEventArgs e)
         {
             if (e.RequestedPresence == BotPresenceRequest.Join)
-                msgGenService.TryAddPool(e.ChannelId);
+                _msgGenService.TryAddPool(e.ChannelId);
             else if (e.RequestedPresence == BotPresenceRequest.Leave)
-                msgGenService.TryRemovePool(e.ChannelId);
+                _msgGenService.TryRemovePool(e.ChannelId);
         }
 
-        private async Task TwitchService_OnGenerationRequestReceived(GenerationRequestReceivedEventArgs e, TwitchService twitchService, MessageGenerationService msgGenService)
+        private async Task TwitchService_OnGenerationRequestReceived(GenerationRequestReceivedEventArgs e)
         {
-            var message = msgGenService.GenerateMessage(e.ChannelId);
-            await twitchService.SendMessageAsync(e.ChannelName, message ?? "You gotta say stuff in chat before I can generate a message!");
+            var message = _msgGenService.GenerateMessage(e.ChannelId);
+            await _twitchService.SendMessageAsync(e.ChannelName, message ?? "You gotta say stuff in chat before I can generate a message!");
         }
 
         private void TwitchService_OnChatMessageDeleted(object sender, MessageReceivedEventArgs<ClearMessage> e)
@@ -122,10 +120,11 @@ namespace TwitchEbooks
             }
         }
 
-        private async Task TwitchService_OnGiftSubReceived(TwitchService twitchService, MessageGenerationService msgGenService, MessageReceivedEventArgs<GiftSubscriptionMessage> e)
+        private async Task TwitchService_OnGiftSubReceived(MessageReceivedEventArgs<GiftSubscriptionMessage> e)
         {
-            var message = msgGenService.GenerateMessage(e.Message.ChannelId);
-            await twitchService.SendMessageAsync(e.Message.ChannelName, $"🎉 Thanks @{e.Message.SenderName}! {message} 🎉");
+            var message = _msgGenService.GenerateMessage(e.Message.ChannelId);
+            // todo: this is gonna look real awkward if there aren't any messages stored, maybe address that at some point
+            await _twitchService.SendMessageAsync(e.Message.ChannelName, $"🎉 Thanks @{e.Message.SenderName}! {message} 🎉");
         }
     }
 }
