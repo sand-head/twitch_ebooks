@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Anybotty.StreamClientLibrary" Version="2020.7.20.4" />
+    <PackageReference Include="Anybotty.StreamClientLibrary" Version="2020.7.20.5" />
     <PackageReference Include="EmbedIO" Version="3.4.3" />
     <PackageReference Include="Markov" Version="2.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="3.1.6" />
