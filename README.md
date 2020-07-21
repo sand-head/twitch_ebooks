@@ -8,3 +8,4 @@ There are various commands that may be used in either the bot's chat or a user's
 2. `~leave`: Makes the bot leave your chat, purging all of the data collected.
 ### User's Chat Commands
 1. `~generate`: The bot uses previously submitted chat messages to generate a new message, and then sends it in chat.
+2. `~leave`: Also makes the bot leave your chat, and can only be used by the broadcaster themselves.
