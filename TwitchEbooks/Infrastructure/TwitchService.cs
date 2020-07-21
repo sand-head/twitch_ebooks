@@ -39,6 +39,7 @@ namespace TwitchEbooks.Infrastructure
         public event EventHandler<GenerationRequestReceivedEventArgs> OnGenerationRequestReceived;
         public event EventHandler<MessageReceivedEventArgs<ChatMessage>> OnChatMessageReceived;
         public event EventHandler<MessageReceivedEventArgs<ClearMessage>> OnChatMessageDeleted;
+        public event EventHandler<MessageReceivedEventArgs<GiftSubscriptionMessage>> OnGiftSubReceived;
         public event EventHandler<BotJoinLeaveReceivedEventArgs> OnBotJoinLeaveReceivedEventArgs;
 
         public async Task ConnectAsync(UserAccessToken tokens)
@@ -126,6 +127,41 @@ namespace TwitchEbooks.Infrastructure
             }
         }
 
+        private async Task HandleUserCommandsAsync(ChatMessage message)
+        {
+            if (message.Message.StartsWith("~generate"))
+            {
+                _logger.LogInformation("Generation request received for channel {ChannelId}.", message.RoomId);
+                OnGenerationRequestReceived?.Invoke(this, new GenerationRequestReceivedEventArgs
+                {
+                    ChannelId = message.RoomId,
+                    ChannelName = message.ChannelName
+                });
+            }
+            else if (message.Message.StartsWith("~leave"))
+            {
+                if (!message.IsBroadcaster)
+                    await SendMessageAsync(message.ChannelName, $"@{message.Username} Only the broadcaster can ask me to leave, sorry!");
+
+                _client.LeaveChannel(message.Username);
+                await SendMessageAsync(message.Username, $"@{message.Username} Successfully left your chat!");
+                OnBotJoinLeaveReceivedEventArgs?.Invoke(this, new BotJoinLeaveReceivedEventArgs
+                {
+                    RequestedPresence = BotPresenceRequest.Leave,
+                    ChannelId = message.UserId,
+                    ChannelName = message.Username,
+                    BotChannelName = _channelName
+                });
+            }
+            else
+            {
+                OnChatMessageReceived?.Invoke(this, new MessageReceivedEventArgs<ChatMessage>
+                {
+                    Message = message
+                });
+            }
+        }
+
         private void TwitchClient_Connected()
         {
             _logger.LogInformation("Twitch client connected!");
@@ -140,23 +176,7 @@ namespace TwitchEbooks.Infrastructure
                 if (chatMessage.RoomId == _userTokens.UserId)
                     await HandleBotCommandsAsync(chatMessage);
                 else
-                {
-                    if (chatMessage.Message.StartsWith("~generate"))
-                    {
-                        _logger.LogInformation("Generation request received for channel {ChannelId}.", chatMessage.RoomId);
-                        OnGenerationRequestReceived?.Invoke(this, new GenerationRequestReceivedEventArgs
-                        {
-                            ChannelId = chatMessage.RoomId,
-                            ChannelName = chatMessage.ChannelName
-                        });
-                        return;
-                    }
-
-                    OnChatMessageReceived?.Invoke(this, new MessageReceivedEventArgs<ChatMessage>
-                    {
-                        Message = chatMessage
-                    });
-                }
+                    await HandleUserCommandsAsync(chatMessage);
             }
             else if (message is ClearMessage clearMessage)
             {
@@ -165,7 +185,13 @@ namespace TwitchEbooks.Infrastructure
                     Message = clearMessage
                 });
             }
-            // todo: maybe do a fun generation when receiving a gift sub?
+            else if (message is GiftSubscriptionMessage giftSubMessage && giftSubMessage.RecipientName.ToLower() == _channelName)
+            {
+                OnGiftSubReceived?.Invoke(this, new MessageReceivedEventArgs<GiftSubscriptionMessage>
+                {
+                    Message = giftSubMessage
+                });
+            }
         }
     }
 }

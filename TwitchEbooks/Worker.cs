@@ -1,10 +1,9 @@
-using Anybotty.StreamClientLibrary.Common.Models.Messages;
+﻿using Anybotty.StreamClientLibrary.Common.Models.Messages;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
@@ -57,12 +56,13 @@ namespace TwitchEbooks
 
             // passing the services like this feels wrong, maybe just make them private properties?
             // that doesn't strike me as great either though
-            twitchService.OnTokensRefreshed += (_, e) => SaveTokens(e.NewTokens);
-            twitchService.OnConnected += async (_, e) => await TwitchService_OnConnected(twitchService);
-            twitchService.OnBotJoinLeaveReceivedEventArgs += (_, e) => TwitchService_OnBotJoinLeaveReceivedEventArgs(e, msgGenService);
+            twitchService.OnTokensRefreshed += (s, e) => SaveTokens(e.NewTokens);
+            twitchService.OnConnected += async (s, e) => await TwitchService_OnConnected(twitchService);
+            twitchService.OnBotJoinLeaveReceivedEventArgs += (s, e) => TwitchService_OnBotJoinLeaveReceivedEventArgs(e, msgGenService);
             twitchService.OnChatMessageReceived += msgGenService.LoadChatMessage;
-            twitchService.OnGenerationRequestReceived += async (_, e) => await TwitchService_OnGenerationRequestReceived(e, twitchService, msgGenService);
+            twitchService.OnGenerationRequestReceived += async (s, e) => await TwitchService_OnGenerationRequestReceived(e, twitchService, msgGenService);
             twitchService.OnChatMessageDeleted += TwitchService_OnChatMessageDeleted;
+            twitchService.OnGiftSubReceived += async (s, e) => await TwitchService_OnGiftSubReceived(twitchService, msgGenService, e);
             await twitchService.ConnectAsync(tokens);
             // todo: execute until stop? or do we already do that?
         }
@@ -120,6 +120,12 @@ namespace TwitchEbooks
                 context.Remove(message);
                 context.SaveChanges();
             }
+        }
+
+        private async Task TwitchService_OnGiftSubReceived(TwitchService twitchService, MessageGenerationService msgGenService, MessageReceivedEventArgs<GiftSubscriptionMessage> e)
+        {
+            var message = msgGenService.GenerateMessage(e.Message.ChannelId);
+            await twitchService.SendMessageAsync(e.Message.ChannelName, $"🎉 Thanks @{e.Message.SenderName}! {message} 🎉");
         }
     }
 }
