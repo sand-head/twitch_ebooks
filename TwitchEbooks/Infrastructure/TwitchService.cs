@@ -30,6 +30,7 @@ namespace TwitchEbooks.Infrastructure
             _client.Log += _logger.LogInformation;
             _client.Connected += TwitchClient_Connected;
             _client.MessageReceived += async (msg) => await TwitchClient_MessageReceived(msg);
+            _client.Disconnected += async () => await TwitchClient_Disconnected();
             _userTokens = null;
             _channelName = null;
         }
@@ -45,27 +46,11 @@ namespace TwitchEbooks.Infrastructure
         public async Task ConnectAsync(UserAccessToken tokens)
         {
             if (tokens == null) throw new ArgumentNullException(nameof(tokens));
+            var (validationResult, validTokens) = await ValidateAndRefreshTokens(tokens);
 
-            var validationResult = await _apiClient.VerifyAccessTokenAsync(tokens.AccessToken);
-            if (validationResult == null)
-            {
-                var newTokens = await _apiClient.RefreshTokensAsync(tokens.RefreshToken, _twitchSettings.ClientId, _twitchSettings.ClientSecret);
-                tokens = new UserAccessToken
-                {
-                    Id = Guid.NewGuid(),
-                    UserId = tokens.UserId,
-                    AccessToken = newTokens.AccessToken,
-                    RefreshToken = newTokens.RefreshToken,
-                    ExpiresIn = newTokens.ExpiresIn,
-                    CreatedOn = DateTime.UtcNow,
-                };
-                OnTokensRefreshed?.Invoke(this, new TokensRefreshedEventArgs(tokens));
-                validationResult = await _apiClient.VerifyAccessTokenAsync(tokens.AccessToken);
-            }
-
-            _userTokens = tokens;
+            _userTokens = validTokens;
             _channelName = validationResult.Login;
-            await _client.ConnectAsync(new TwitchConnection(validationResult.Login, tokens.AccessToken));
+            await _client.ConnectAsync(new TwitchConnection(validationResult.Login, validTokens.AccessToken));
         }
 
         public async Task JoinChannelByIdAsync(uint channelId)
@@ -85,6 +70,27 @@ namespace TwitchEbooks.Infrastructure
         public async Task SendMessageAsync(string channelName, string message)
         {
             await _client.SendMessageAsync(channelName, message);
+        }
+
+        private async Task<(VerifyApiMessage, UserAccessToken)> ValidateAndRefreshTokens(UserAccessToken tokens)
+        {
+            var validationResult = await _apiClient.VerifyAccessTokenAsync(tokens.AccessToken);
+            if (validationResult == null)
+            {
+                var newTokens = await _apiClient.RefreshTokensAsync(tokens.RefreshToken, _twitchSettings.ClientId, _twitchSettings.ClientSecret);
+                tokens = new UserAccessToken
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = tokens.UserId,
+                    AccessToken = newTokens.AccessToken,
+                    RefreshToken = newTokens.RefreshToken,
+                    ExpiresIn = newTokens.ExpiresIn,
+                    CreatedOn = DateTime.UtcNow,
+                };
+                OnTokensRefreshed?.Invoke(this, new TokensRefreshedEventArgs(tokens));
+                validationResult = await _apiClient.VerifyAccessTokenAsync(tokens.AccessToken);
+            }
+            return (validationResult, tokens);
         }
 
         private async Task HandleBotCommandsAsync(ChatMessage message)
@@ -192,6 +198,14 @@ namespace TwitchEbooks.Infrastructure
                     Message = giftSubMessage
                 });
             }
+        }
+
+        private async Task TwitchClient_Disconnected()
+        {
+            var (validationResult, validTokens) = await ValidateAndRefreshTokens(_userTokens);
+            _userTokens = validTokens;
+            _channelName = validationResult.Login;
+            await _client.ReconnectAsync(new TwitchConnection(validationResult.Login, validTokens.AccessToken));
         }
     }
 }
