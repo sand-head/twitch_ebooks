@@ -1,31 +1,20 @@
-#See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
+FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
+WORKDIR /source
 
-FROM mcr.microsoft.com/dotnet/core/runtime:3.1-buster-slim AS base
-WORKDIR /app
-
-FROM mcr.microsoft.com/dotnet/core/sdk:3.1-buster AS build
-WORKDIR /src
+# copy csproj and restore as distinct layers
 ARG PAT
+COPY *.csproj .
 RUN wget -qO- https://raw.githubusercontent.com/Microsoft/artifacts-credprovider/master/helpers/installcredprovider.sh | bash
-ENV NUGET_CREDENTIALPROVIDER_SESSIONTOKENCACHE_ENABLED true
-ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS "{\"endpointCredentials\": [{\"endpoint\":\"https://pkgs.dev.azure.com/sand-head/_packaging/Justin-Has-a-NuGet-Feed/nuget/v3/index.json\", \"password\":\"${PAT}\"}]}"
-COPY ["TwitchEbooks.Database/TwitchEbooks.Database.csproj", "TwitchEbooks.Database/"]
-COPY ["TwitchEbooks/TwitchEbooks.csproj", "TwitchEbooks/"]
-RUN dotnet restore -s "https://pkgs.dev.azure.com/sand-head/_packaging/Justin-Has-a-NuGet-Feed/nuget/v3/index.json" -s "https://api.nuget.org/v3/index.json" "TwitchEbooks/TwitchEbooks.csproj"
+RUN export ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS="{\"endpointCredentials\": [{\"endpoint\":\"https://pkgs.dev.azure.com/sand-head/_packaging/Justin-Has-a-NuGet-Feed/nuget/v3/index.json\", \"password\":\"${PAT}\"}]}" \
+	&& dotnet restore && unset VSS_NUGET_EXTERNAL_FEED_ENDPOINTS
+
+# copy and publish app and libraries
 COPY . .
-WORKDIR "/src/TwitchEbooks"
-RUN dotnet build "TwitchEbooks.csproj" -c Release -o /app/build
+RUN dotnet publish -c release -o /app --no-restore
 
-FROM build AS publish
-RUN dotnet publish "TwitchEbooks.csproj" -c Release -o /app/publish
-
-FROM base AS final
+# final stage/image
+FROM mcr.microsoft.com/dotnet/runtime:5.0
 WORKDIR /app
-COPY --from=publish /app/publish .
-LABEL traefik.enable=true
-LABEL traefik.http.routers.twitch-ebooks.rule="Host(`robo.schweigert.dev`)"
-LABEL traefik.http.routers.twitch-ebooks.tls=true
-LABEL traefik.http.routers.twitch-ebooks.tls.certresolver="le"
-LABEL traefik.http.routers.twitch-ebooks.tls.domains[0].main="robo.schweigert.dev"
+COPY --from=build /app .
 EXPOSE 80
 ENTRYPOINT ["dotnet", "TwitchEbooks.dll"]
