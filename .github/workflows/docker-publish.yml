@@ -18,6 +18,12 @@ jobs:
         source-url: https://pkgs.dev.azure.com/sand-head/_packaging/Justin-Has-a-NuGet-Feed/nuget/v3/index.json
       env:
         NUGET_AUTH_TOKEN: ${{ secrets.AZDO_PAT }}
+    - uses: actions/cache@v2
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
