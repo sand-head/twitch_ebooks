@@ -3,7 +3,6 @@ name: Test & Publish Docker Image
 on:
   push:
     branches: [ master ]
-    tags: [ v* ]
   pull_request:
 
 jobs:
@@ -37,8 +36,6 @@ jobs:
     if: github.event_name == 'push'
     steps:
     - uses: actions/checkout@v2
-    # - run: echo ::set-env name=VERSION::$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
-    - run: echo "VERSION=$(echo ${{ github.ref }} | sed -e 's,.*/\(.*\),\1,')" >> $GITHUB_ENV
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v1
     - name: Set up Docker Buildx
@@ -65,4 +62,3 @@ jobs:
           PAT=${{ secrets.AZDO_PAT }}
         tags: |
           ghcr.io/${{ github.repository_owner }}/twitch_ebooks:latest
-          ghcr.io/${{ github.repository_owner }}/twitch_ebooks:${{ env.VERSION }}
