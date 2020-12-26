@@ -1,9 +1,10 @@
 FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
 WORKDIR /source
 
-# copy csproj and restore as distinct layers
+# copy csprojs & sln and restore as distinct layers
 ARG PAT
 COPY *.csproj .
+COPY *.sln .
 RUN wget -qO- https://raw.githubusercontent.com/Microsoft/artifacts-credprovider/master/helpers/installcredprovider.sh | bash
 RUN export ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS="{\"endpointCredentials\": [{\"endpoint\":\"https://pkgs.dev.azure.com/sand-head/_packaging/Justin-Has-a-NuGet-Feed/nuget/v3/index.json\", \"password\":\"${PAT}\"}]}" \
 	&& dotnet restore && unset VSS_NUGET_EXTERNAL_FEED_ENDPOINTS
