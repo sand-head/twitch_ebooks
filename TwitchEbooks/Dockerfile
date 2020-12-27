@@ -3,7 +3,8 @@ WORKDIR /source
 
 # copy csprojs & sln and restore as distinct layers
 ARG PAT
-COPY *.csproj .
+COPY */*.csproj ./  
+RUN for file in $(ls *.csproj); do mkdir -p ${file%.*}/ && mv $file ${file%.*}/; done
 COPY *.sln .
 RUN wget -qO- https://raw.githubusercontent.com/Microsoft/artifacts-credprovider/master/helpers/installcredprovider.sh | bash
 RUN export ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS="{\"endpointCredentials\": [{\"endpoint\":\"https://pkgs.dev.azure.com/sand-head/_packaging/Justin-Has-a-NuGet-Feed/nuget/v3/index.json\", \"password\":\"${PAT}\"}]}" \
