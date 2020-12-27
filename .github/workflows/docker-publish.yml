@@ -59,6 +59,7 @@ jobs:
         file: ./TwitchEbooks/Dockerfile
         platforms: linux/amd64,linux/arm64
         build-args: |
-          PAT=${{ secrets.AZDO_PAT }}
+          AZDO_EMAIL=${{ secrets.AZDO_EMAIL }}
+          AZDO_PAT=${{ secrets.AZDO_PAT }}
         tags: |
           ghcr.io/${{ github.repository_owner }}/twitch_ebooks:latest
