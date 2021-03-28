@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
@@ -30,21 +31,31 @@ namespace TwitchEbooks.Infrastructure
         {
             using var scope = _scopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetService<TwitchEbooksContext>();
-            var channels = await context.Channels.Include(c => c.Messages).ToListAsync(token);
+            var channels = await context.Channels.ToListAsync(token);
 
-            foreach (var channel in channels)
+            var tasks = channels.Select(c => LoadMessagesIntoPool(c.Id, context.Messages.Where(m => m.ChannelId == c.Id).AsAsyncEnumerable()));
+            await Task.WhenAll(tasks);
+        }
+
+        public async Task LoadMessagesIntoPool(uint channelId, IAsyncEnumerable<TwitchMessage> messages)
+        {
+            // if the pool already exists, remove it
+            // at this point we want an entirely new pool
+            if (_channelPools.ContainsKey(channelId))
+                _channelPools.Remove(channelId);
+
+            _logger.LogInformation("Creating pool for channel {ChannelId}...", channelId);
+            var stopwatch = Stopwatch.StartNew();
+            var pool = new MessageGenerationPool();
+
+            await foreach (var message in messages)
             {
-                _logger.LogInformation("Creating pool for channel {ChannelId}...", channel.Id);
-                var stopwatch = Stopwatch.StartNew();
-                var pool = new MessageGenerationPool();
-                foreach (var message in channel.Messages)
-                {
-                    pool.LoadChatMessage(message);
-                }
-                _channelPools.Add(channel.Id, pool);
-                stopwatch.Stop();
-                _logger.LogInformation("Pool for channel {ChannelId} created. ({Elapsed} ms)", channel.Id, stopwatch.ElapsedMilliseconds);
+                pool.LoadChatMessage(message);
             }
+
+            _channelPools.Add(channelId, pool);
+            stopwatch.Stop();
+            _logger.LogInformation("Pool for channel {ChannelId} created. ({Elapsed} ms)", channelId, stopwatch.ElapsedMilliseconds);
         }
 
         public bool TryAddPool(uint channelId)
@@ -64,6 +75,7 @@ namespace TwitchEbooks.Infrastructure
         {
             if (!_channelPools.Remove(channelId)) return false;
             using var scope = _scopeFactory.CreateScope();
+            // holy shit did I really make this also delete the channel from the database???
             var context = scope.ServiceProvider.GetService<TwitchEbooksContext>();
             var channel = context.Channels.Find(channelId);
             context.Channels.Remove(channel);
@@ -94,8 +106,10 @@ namespace TwitchEbooks.Infrastructure
 
         public string GenerateMessage(uint channelId)
         {
-            if (!_channelPools.TryGetValue(channelId, out var pool)) throw new Exception("Could not generate a message for a pool that does not exist.");
-            if (pool.LoadedMessages == 0) return null;
+            if (!_channelPools.TryGetValue(channelId, out var pool))
+                throw new Exception("Could not generate a message for a pool that does not exist.");
+            if (pool.LoadedMessages == 0)
+                return null;
             return pool.GenerateMessage();
         }
     }

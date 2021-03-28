@@ -40,6 +40,7 @@ namespace TwitchEbooks.Infrastructure
         public event EventHandler<GenerationRequestReceivedEventArgs> OnGenerationRequestReceived;
         public event EventHandler<MessageReceivedEventArgs<ChatMessage>> OnChatMessageReceived;
         public event EventHandler<MessageReceivedEventArgs<ClearMessage>> OnChatMessageDeleted;
+        public event EventHandler<PurgeWordRequestReceivedEventArgs> OnPurgeWordRequestReceived;
         public event EventHandler<MessageReceivedEventArgs<GiftSubscriptionMessage>> OnGiftSubReceived;
         public event EventHandler<BotJoinLeaveReceivedEventArgs> OnBotJoinLeaveReceivedEventArgs;
 
@@ -147,7 +148,10 @@ namespace TwitchEbooks.Infrastructure
             else if (message.Message.StartsWith("~leave"))
             {
                 if (!message.IsBroadcaster)
+                {
                     await SendMessageAsync(message.ChannelName, $"@{message.Username} Only the broadcaster can ask me to leave, sorry!");
+                    return;
+                }
 
                 _client.LeaveChannel(message.Username);
                 await SendMessageAsync(message.Username, $"@{message.Username} Successfully left your chat!");
@@ -157,6 +161,27 @@ namespace TwitchEbooks.Infrastructure
                     ChannelId = message.UserId,
                     ChannelName = message.Username,
                     BotChannelName = _channelName
+                });
+            }
+            else if (message.Message.StartsWith("~purge"))
+            {
+                if (!message.IsBroadcaster || !message.IsMod)
+                {
+                    await SendMessageAsync(message.ChannelName, $"@{message.Username} Only mods can purge words, sorry!");
+                    return;
+                }
+
+                var splitMsg = message.Message.Split(' ');
+                if (splitMsg.Length <= 1 || string.IsNullOrWhiteSpace(splitMsg[1]))
+                {
+                    await SendMessageAsync(message.ChannelName, $"@{message.Username} You have to include a word to purge!");
+                    return;
+                }
+
+                OnPurgeWordRequestReceived?.Invoke(this, new PurgeWordRequestReceivedEventArgs
+                {
+                    ChannelId = message.UserId,
+                    Word = string.Join(' ', splitMsg[1..])
                 });
             }
             else

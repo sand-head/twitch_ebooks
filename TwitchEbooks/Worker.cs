@@ -1,4 +1,5 @@
 ﻿using Anybotty.StreamClientLibrary.Common.Models.Messages;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -62,6 +63,7 @@ namespace TwitchEbooks
             _twitchService.OnGenerationRequestReceived += async (s, e) => await TwitchService_OnGenerationRequestReceived(e);
             _twitchService.OnChatMessageDeleted += TwitchService_OnChatMessageDeleted;
             _twitchService.OnGiftSubReceived += async (s, e) => await TwitchService_OnGiftSubReceived(e);
+            _twitchService.OnPurgeWordRequestReceived += async (s, e) => await TwitchService_OnPurgeWordRequestReceived(e);
             await _twitchService.ConnectAsync(tokens);
         }
 
@@ -111,10 +113,10 @@ namespace TwitchEbooks
             using var scope = Services.CreateScope();
             var context = scope.ServiceProvider.GetService<TwitchEbooksContext>();
             var message = context.Messages.Find(e.Message.MessageId);
+
             if (message != null)
             {
-                // we don't actually have a way to remove a message in a Markov chain
-                // so for now at least we're just gonna rely on them being purged on program restart
+                // todo: rework this to use the solution for purging words
                 context.Remove(message);
                 context.SaveChanges();
             }
@@ -125,6 +127,21 @@ namespace TwitchEbooks
             var message = _msgGenService.GenerateMessage(e.Message.ChannelId);
             // todo: this is gonna look real awkward if there aren't any messages stored, maybe address that at some point
             await _twitchService.SendMessageAsync(e.Message.ChannelName, $"🎉 Thanks @{e.Message.SenderName}! {message} 🎉");
+        }
+
+        private async Task TwitchService_OnPurgeWordRequestReceived(PurgeWordRequestReceivedEventArgs e)
+        {
+            using var scope = Services.CreateScope();
+            var context = scope.ServiceProvider.GetService<TwitchEbooksContext>();
+            var badMessages = context.Messages.Where(m => m.ChannelId == e.ChannelId && m.Message.Contains(e.Word));
+
+            // ditch the bad messages
+            context.Remove(badMessages);
+            context.SaveChanges();
+
+            // re-create the pool for the given channel
+            var messages = context.Messages.Where(m => m.ChannelId == e.ChannelId).AsAsyncEnumerable();
+            await _msgGenService.LoadMessagesIntoPool(e.ChannelId, messages);
         }
     }
 }
