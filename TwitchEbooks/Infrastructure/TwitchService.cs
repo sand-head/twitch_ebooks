@@ -165,7 +165,7 @@ namespace TwitchEbooks.Infrastructure
             }
             else if (message.Message.StartsWith("~purge"))
             {
-                if (!message.IsBroadcaster || !message.IsMod)
+                if (!message.IsBroadcaster && !message.IsMod)
                 {
                     await SendMessageAsync(message.ChannelName, $"@{message.Username} Only mods can purge words, sorry!");
                     return;
