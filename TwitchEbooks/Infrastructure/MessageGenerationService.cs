@@ -29,11 +29,20 @@ namespace TwitchEbooks.Infrastructure
 
         public async Task StartAsync(CancellationToken token = default)
         {
+            async Task LoadMessagesFromDatabase(uint channelId)
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var context = scope.ServiceProvider.GetService<TwitchEbooksContext>();
+
+                var messages = context.Messages.Where(m => m.ChannelId == channelId).AsAsyncEnumerable();
+                await LoadMessagesIntoPool(channelId, messages);
+            }
+
             using var scope = _scopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetService<TwitchEbooksContext>();
             var channels = await context.Channels.ToListAsync(token);
 
-            var tasks = channels.Select(c => LoadMessagesIntoPool(c.Id, context.Messages.Where(m => m.ChannelId == c.Id).AsAsyncEnumerable()));
+            var tasks = channels.Select(c => LoadMessagesFromDatabase(c.Id));
             await Task.WhenAll(tasks);
         }
 
