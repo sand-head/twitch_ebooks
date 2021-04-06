@@ -50,6 +50,23 @@ impl MarkovChain {
     }
   }
 
+  /// Removes the given string from the chain.
+  /// This only works for single words because thinking about full phrases gives me a headache.
+  pub fn remove<S: Into<String>>(&mut self, string: S) {
+    let string: String = string.into();
+    let key = Some(string.clone());
+    if !self.transitions.contains_key(&key) {
+      return;
+    }
+
+    // step 1: remove state
+    self.transitions.remove(&key);
+    // step 2: remove from all transitions
+    for val in self.transitions.values_mut() {
+      val.retain(|k, _| k == &key);
+    }
+  }
+
   /// Gets the next "state" in the chain.
   fn next(&self, previous: &Option<String>) -> Option<String> {
     let sum: usize = self.transitions[&previous].iter().map(|(_, v)| v).sum();
@@ -68,6 +85,7 @@ impl MarkovChain {
     unreachable!("The RNG broke the bounds of the range");
   }
 
+  /// Generate a string.
   pub fn generate(&self) -> Option<String> {
     if self.transitions.len() == 0 {
       // whoops! we don't have any transitions, so we can't generate anything
