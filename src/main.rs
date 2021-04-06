@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use chain::Chain;
+use markov::MarkovChain;
 
-mod chain;
 mod http;
+mod markov;
 
-struct App<'a> {
-  chains: HashMap<u32, Chain<'a>>,
+struct App {
+  chains: HashMap<u32, MarkovChain>,
 }
-impl<'a> Default for App<'a> {
+impl Default for App {
   fn default() -> Self {
     Self {
       chains: HashMap::new(),
