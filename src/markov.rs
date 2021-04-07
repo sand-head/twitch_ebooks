@@ -50,12 +50,15 @@ impl MarkovChain {
     }
   }
 
-  /// Removes the given string from the chain.
-  /// This only works for single words because thinking about full phrases gives me a headache.
-  pub fn remove<S: Into<String>>(&mut self, string: S) {
+  /// Removes the given string from the chain, assuming it is a single word.
+  // todo: is this even useful if it cannot remove phrases?
+  // in the case that it isn't, would we be better off just rebuilding from scratch?
+  // traversing the entire chain looking for a phrase would be challenging at best
+  pub fn remove_word<S: Into<String>>(&mut self, string: S) {
     let string: String = string.into();
     let key = Some(string.clone());
-    if !self.transitions.contains_key(&key) {
+    // if the string has a space or isn't a state, return
+    if string.contains(' ') || !self.transitions.contains_key(&key) {
       return;
     }
 
