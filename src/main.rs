@@ -1,15 +1,23 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryInto, time::Duration};
 
 use anyhow::Result;
 use database::models::UserAccessToken;
 use dotenv::{dotenv, from_filename};
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use markov::MarkovChain;
 use sqlx::PgPool;
-use twitch::tokens::PostgresTokenStorage;
+use twitch::{
+  api::{
+    oauth::{self, validate},
+    users,
+  },
+  tokens::PostgresTokenStorage,
+};
 use twitch_irc::{
-  login::RefreshingLoginCredentials, message::ServerMessage, ClientConfig, TCPTransport,
-  TwitchIRCClient,
+  login::{RefreshingLoginCredentials, UserAccessToken as IrcAccessToken},
+  message::ServerMessage,
+  ClientConfig, TCPTransport, TwitchIRCClient,
 };
 
 mod database;
@@ -38,6 +46,20 @@ impl Default for App {
   }
 }
 
+fn format_auth_url(scopes: Vec<&'static str>) -> Result<String> {
+  let scopes: String = scopes.into_iter().intersperse(" ").collect();
+  let url = url::Url::parse_with_params(
+    "https://id.twitch.tv/oauth2/authorize",
+    &[
+      ("client_id", std::env::var("TWITCH_CLIENT_ID")?),
+      ("redirect_uri", std::env::var("TWITCH_REDIRECT_URI")?),
+      ("response_type", "code".to_string()),
+      ("scope", scopes),
+    ],
+  )?;
+  Ok(url.to_string())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
   // load .env
@@ -57,23 +79,50 @@ async fn main() -> Result<()> {
 
   // get latest auth tokens
   let mut conn = pool.acquire().await?;
-  let auth_tokens = UserAccessToken::get_latest(&mut conn).await?;
+  let mut auth_tokens = UserAccessToken::get_latest(&mut conn).await?;
   // if none available, pop open the http server so we can get some from twitch
   if auth_tokens.is_none() {
+    // todo this looks ugly clean up pls
     println!("hey so we don't have any twitch access tokens, mind running out and getting some?");
-    println!("I'll go ahead and open up the endpoint for you...");
-    http::expose_oauth_endpoint().await?;
+    println!("I'll go ahead and open up the endpoint for you, but in the meantime, feel free to head over here:");
+    println!("{}", format_auth_url(vec!["chat:read", "chat:edit"])?);
+    let tokens = http::expose_endpoint_and_wait_for_tokens().await?;
+    println!("ok we have tokens now, thank you");
+    let created_at = chrono::Utc::now();
+    let expires_at =
+      created_at + chrono::Duration::from_std(Duration::from_secs(tokens.expires_in.try_into()?))?;
+    let validated = oauth::validate(&tokens.access_token).await?;
+    auth_tokens = Some(
+      UserAccessToken::add(
+        &mut conn,
+        validated.user_id.parse::<i64>()?,
+        &IrcAccessToken {
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+          created_at,
+          expires_at: Some(expires_at),
+        },
+      )
+      .await?,
+    );
   }
 
+  // get user details using auth tokens
+  let auth_tokens = auth_tokens.unwrap();
+  let user = users::get_user(auth_tokens.access_token.as_str(), auth_tokens.user_id)
+    .await?
+    .expect("Could not get details of bot user");
+  let user_id = user.id.parse::<i64>()?;
+  println!("Got bot user details for login");
+
   // set up twitch connection
-  // todo: use our own twitch account instead of an anonymous one
   let client_id = std::env::var("TWITCH_CLIENT_ID")?;
   let client_secret = std::env::var("TWITCH_CLIENT_SECRET")?;
   let config = ClientConfig::new_simple(RefreshingLoginCredentials::new(
-    "todo put login here".to_string(),
+    user.login,
     client_id,
     client_secret,
-    PostgresTokenStorage::new(1, pool.clone()),
+    PostgresTokenStorage::new(user_id, pool.clone()),
   ));
   let (mut incoming, client) = TwitchIRCClient::<TCPTransport, _>::new(config);
 

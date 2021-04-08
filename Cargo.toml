@@ -20,3 +20,5 @@ uuid = { version = "0.8", features = ["serde", "v4"] }
 twitch-irc = { version = "2.2", features = ["refreshing-token"] }
 lazy_static = "1.4"
 async-trait = "0.1.48"
+reqwest = "0.11"
+itertools = "0.10"
