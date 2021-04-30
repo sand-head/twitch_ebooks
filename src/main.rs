@@ -1,7 +1,12 @@
-use std::{collections::HashMap, convert::TryInto, time::Duration};
+use std::{
+  collections::HashMap,
+  convert::TryInto,
+  sync::{Arc, Mutex},
+  time::Duration,
+};
 
 use anyhow::Result;
-use database::models::UserAccessToken;
+use database::models::{TwitchChannel, TwitchMessage, UserAccessToken};
 use dotenv::{dotenv, from_filename};
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -35,16 +40,7 @@ lazy_static! {
   };
 }
 
-struct App {
-  chains: HashMap<String, MarkovChain>,
-}
-impl Default for App {
-  fn default() -> Self {
-    Self {
-      chains: HashMap::new(),
-    }
-  }
-}
+type MarkovMap = Arc<Mutex<HashMap<String, MarkovChain>>>;
 
 fn format_auth_url(scopes: Vec<&'static str>) -> Result<String> {
   let scopes: String = scopes.into_iter().intersperse(" ").collect();
@@ -73,9 +69,6 @@ async fn main() -> Result<()> {
   database::create_database_if_not_exists(&db_url).await?;
   let pool = PgPool::connect(&db_url).await?;
   sqlx::migrate!("./migrations").run(&pool).await?;
-
-  // set up app state
-  let mut app = App::default();
 
   // get latest auth tokens
   let mut conn = pool.acquire().await?;
@@ -107,13 +100,43 @@ async fn main() -> Result<()> {
     );
   }
 
-  // get user details using auth tokens
+  // get bot user details using auth tokens
   let auth_tokens = auth_tokens.unwrap();
   let user = users::get_user(auth_tokens.access_token.as_str(), auth_tokens.user_id)
     .await?
     .expect("Could not get details of bot user");
   let user_id = user.id.parse::<i64>()?;
   println!("Got bot user details for login");
+
+  // get all connected channels
+  let channels = TwitchChannel::list(&mut conn).await?;
+  let channel_users = users::get_users(
+    &auth_tokens.access_token,
+    channels.iter().map(|c| c.id).collect(),
+  )
+  .await?;
+
+  // set up markov chains for connected channels
+  let chains: MarkovMap = Arc::new(Mutex::new(HashMap::new()));
+  for channel in channel_users.clone() {
+    let chains = chains.clone();
+    let pool = pool.clone();
+    tokio::spawn(async move {
+      // get a db connection and this channel's messages
+      let mut conn = pool.acquire().await.unwrap();
+      let channel_id = channel.id.parse::<i64>().unwrap();
+      let messages = TwitchMessage::list(&mut conn, channel_id)
+        .await
+        .expect("Could not retrieve messages from database");
+
+      // create a chain, stuff it full of messages
+      let mut chain = MarkovChain::default();
+      for message in messages {
+        chain.add(message.message);
+      }
+      chains.lock().unwrap().insert(channel.login, chain);
+    });
+  }
 
   // set up twitch connection
   let client_id = std::env::var("TWITCH_CLIENT_ID")?;
@@ -134,6 +157,8 @@ async fn main() -> Result<()> {
         ServerMessage::Privmsg(message) => {
           if message.message_text.starts_with("~generate") {
             println!("Oh hey! A generate request!");
+          } else if message.message_text.starts_with("~join") {
+            println!("Oh hey! A join request!");
           } else {
             println!("This one goes in the chain bin!");
           }
@@ -143,11 +168,11 @@ async fn main() -> Result<()> {
     }
   });
 
-  // todo: join all channels
-  app
-    .chains
-    .insert("sand_head".to_owned(), MarkovChain::default());
-  client.join("sand_head".to_owned());
+  // actually join each channel
+  for channel in channel_users {
+    client.join(channel.login.clone());
+    println!("Joined channel {}", channel.login);
+  }
 
   incoming_handle.await?;
   Ok(())
