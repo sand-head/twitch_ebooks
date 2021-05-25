@@ -60,7 +60,7 @@ jobs:
         file: ./TwitchEbooks/Dockerfile
         platforms: linux/amd64,linux/arm64
         build-args: |
-          AZDO_EMAIL=${{ secrets.AZDO_EMAIL }}
-          AZDO_PAT=${{ secrets.AZDO_PAT }}
+          GH_USERNAME=sand-head
+          GH_PAT=${{ secrets.GH_PAT }}
         tags: |
           ghcr.io/${{ github.repository_owner }}/twitch_ebooks:latest
