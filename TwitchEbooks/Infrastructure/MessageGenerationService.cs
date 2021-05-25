@@ -97,6 +97,11 @@ namespace TwitchEbooks.Infrastructure
             // this is only meant to be used by the TwitchService
             if (!_channelPools.TryGetValue(e.Message.RoomId, out var pool)) return;
 
+            using var scope = _scopeFactory.CreateScope();
+            var context = scope.ServiceProvider.GetService<TwitchEbooksContext>();
+            // if a user is banned from being included in generation, don't store their messages
+            if (context.BannedTwitchUsers.Any(b => b.ChannelId == e.Message.RoomId && b.Id == e.Message.UserId)) return;
+
             var message = new TwitchMessage
             {
                 Id = e.Message.MessageId,
@@ -105,12 +110,10 @@ namespace TwitchEbooks.Infrastructure
                 Message = e.Message.Message,
                 ReceivedOn = DateTime.UtcNow
             };
-            pool.LoadChatMessage(message);
 
-            using var scope = _scopeFactory.CreateScope();
-            var context = scope.ServiceProvider.GetService<TwitchEbooksContext>();
             context.Messages.Add(message);
             context.SaveChanges();
+            pool.LoadChatMessage(message);
         }
 
         public string GenerateMessage(uint channelId)

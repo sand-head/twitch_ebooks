@@ -64,6 +64,7 @@ namespace TwitchEbooks
             _twitchService.OnChatMessageDeleted += TwitchService_OnChatMessageDeleted;
             _twitchService.OnGiftSubReceived += async (s, e) => await TwitchService_OnGiftSubReceived(e);
             _twitchService.OnPurgeWordRequestReceived += async (s, e) => await TwitchService_OnPurgeWordRequestReceived(e);
+            _twitchService.OnBanUserRequestReceived += async (s, e) => await TwitchService_OnBanUserRequestReceived(e);
             await _twitchService.ConnectAsync(tokens);
         }
 
@@ -137,6 +138,27 @@ namespace TwitchEbooks
 
             // ditch the bad messages
             context.Remove(badMessages);
+            context.SaveChanges();
+
+            // re-create the pool for the given channel
+            var messages = context.Messages.Where(m => m.ChannelId == e.ChannelId).AsAsyncEnumerable();
+            await _msgGenService.LoadMessagesIntoPool(e.ChannelId, messages);
+        }
+
+        private async Task TwitchService_OnBanUserRequestReceived(BanUserRequestReceivedEventArgs e)
+        {
+            using var scope = Services.CreateScope();
+            var context = scope.ServiceProvider.GetService<TwitchEbooksContext>();
+            var badMessages = context.Messages.Where(m => m.ChannelId == e.ChannelId && m.UserId == e.UserId);
+
+            // ditch the bad messages and add the user
+            context.Remove(badMessages);
+            context.BannedTwitchUsers.Add(new BannedTwitchUser
+            {
+                Id = e.UserId,
+                ChannelId = e.ChannelId,
+                BannedOn = DateTime.UtcNow
+            });
             context.SaveChanges();
 
             // re-create the pool for the given channel

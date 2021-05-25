@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TwitchEbooks.Database;
@@ -9,9 +10,10 @@ using TwitchEbooks.Database;
 namespace TwitchEbooks.Database.Migrations
 {
     [DbContext(typeof(TwitchEbooksContext))]
-    partial class TwitchEbooksContextModelSnapshot : ModelSnapshot
+    [Migration("20210525012520_AddBannedUsers")]
+    partial class AddBannedUsers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

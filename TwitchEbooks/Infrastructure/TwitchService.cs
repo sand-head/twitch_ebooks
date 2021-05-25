@@ -41,6 +41,7 @@ namespace TwitchEbooks.Infrastructure
         public event EventHandler<MessageReceivedEventArgs<ChatMessage>> OnChatMessageReceived;
         public event EventHandler<MessageReceivedEventArgs<ClearMessage>> OnChatMessageDeleted;
         public event EventHandler<PurgeWordRequestReceivedEventArgs> OnPurgeWordRequestReceived;
+        public event EventHandler<BanUserRequestReceivedEventArgs> OnBanUserRequestReceived;
         public event EventHandler<MessageReceivedEventArgs<GiftSubscriptionMessage>> OnGiftSubReceived;
         public event EventHandler<BotJoinLeaveReceivedEventArgs> OnBotJoinLeaveReceivedEventArgs;
 
@@ -182,6 +183,28 @@ namespace TwitchEbooks.Infrastructure
                 {
                     ChannelId = message.UserId,
                     Word = string.Join(' ', splitMsg[1..])
+                });
+            }
+            else if (message.Message.StartsWith("~ban"))
+            {
+                if (!message.IsBroadcaster && !message.IsMod)
+                {
+                    await SendMessageAsync(message.ChannelName, $"@{message.Username} Only mods can ban users, sorry!");
+                    return;
+                }
+
+                var splitMsg = message.Message.Split(' ');
+                if (splitMsg.Length <= 1 || string.IsNullOrWhiteSpace(splitMsg[1]))
+                {
+                    await SendMessageAsync(message.ChannelName, $"@{message.Username} You have to include a username to ban!");
+                    return;
+                }
+
+                var user = await _apiClient.GetUserAsync(_userTokens.AccessToken, _twitchSettings.ClientId, (UserInputType.Username, splitMsg[1].Trim()));
+                OnBanUserRequestReceived?.Invoke(this, new BanUserRequestReceivedEventArgs
+                {
+                    ChannelId = message.UserId,
+                    UserId = uint.Parse(user.Id)
                 });
             }
             else
