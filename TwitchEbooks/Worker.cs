@@ -137,7 +137,7 @@ namespace TwitchEbooks
             var badMessages = context.Messages.Where(m => m.ChannelId == e.ChannelId && m.Message.Contains(e.Word));
 
             // ditch the bad messages
-            context.Remove(badMessages);
+            context.Messages.RemoveRange(badMessages);
             context.SaveChanges();
 
             // re-create the pool for the given channel
@@ -152,7 +152,7 @@ namespace TwitchEbooks
             var badMessages = context.Messages.Where(m => m.ChannelId == e.ChannelId && m.UserId == e.UserId);
 
             // ditch the bad messages and add the user
-            context.Remove(badMessages);
+            context.Messages.RemoveRange(badMessages);
             context.BannedTwitchUsers.Add(new BannedTwitchUser
             {
                 Id = e.UserId,
