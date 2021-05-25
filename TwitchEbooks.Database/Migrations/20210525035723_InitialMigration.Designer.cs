@@ -10,22 +10,41 @@ using TwitchEbooks.Database;
 namespace TwitchEbooks.Database.Migrations
 {
     [DbContext(typeof(TwitchEbooksContext))]
-    [Migration("20200717044044_InitialMigration")]
+    [Migration("20210525035723_InitialMigration")]
     partial class InitialMigration
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn)
-                .HasAnnotation("ProductVersion", "3.1.6")
-                .HasAnnotation("Relational:MaxIdentifierLength", 63);
+                .HasAnnotation("Relational:MaxIdentifierLength", 63)
+                .HasAnnotation("ProductVersion", "5.0.4")
+                .HasAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
+
+            modelBuilder.Entity("TwitchEbooks.Database.Models.BannedTwitchUser", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("BannedOn")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("Id", "ChannelId");
+
+                    b.HasIndex("ChannelId");
+
+                    b.ToTable("BannedTwitchUsers");
+                });
 
             modelBuilder.Entity("TwitchEbooks.Database.Models.TwitchChannel", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("bigint")
+                        .HasAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
 
                     b.HasKey("Id");
 
@@ -83,6 +102,17 @@ namespace TwitchEbooks.Database.Migrations
                     b.ToTable("AccessTokens");
                 });
 
+            modelBuilder.Entity("TwitchEbooks.Database.Models.BannedTwitchUser", b =>
+                {
+                    b.HasOne("TwitchEbooks.Database.Models.TwitchChannel", "Channel")
+                        .WithMany("BannedUsers")
+                        .HasForeignKey("ChannelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Channel");
+                });
+
             modelBuilder.Entity("TwitchEbooks.Database.Models.TwitchMessage", b =>
                 {
                     b.HasOne("TwitchEbooks.Database.Models.TwitchChannel", "Channel")
@@ -90,6 +120,15 @@ namespace TwitchEbooks.Database.Migrations
                         .HasForeignKey("ChannelId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Channel");
+                });
+
+            modelBuilder.Entity("TwitchEbooks.Database.Models.TwitchChannel", b =>
+                {
+                    b.Navigation("BannedUsers");
+
+                    b.Navigation("Messages");
                 });
 #pragma warning restore 612, 618
         }
