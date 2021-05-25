@@ -8,14 +8,14 @@ namespace TwitchEbooks.Database.Migrations
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            //migrationBuilder.AlterColumn<long>(
-            //    name: "Id",
-            //    table: "Channels",
-            //    type: "bigint",
-            //    nullable: false,
-            //    oldClrType: typeof(long),
-            //    oldType: "bigint")
-            //    .OldAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
+            migrationBuilder.AlterColumn<long>(
+                name: "Id",
+                table: "Channels",
+                type: "bigint",
+                nullable: false,
+                oldClrType: typeof(long),
+                oldType: "bigint")
+                .OldAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
 
             migrationBuilder.CreateTable(
                 name: "BannedTwitchUsers",
@@ -47,14 +47,14 @@ namespace TwitchEbooks.Database.Migrations
             migrationBuilder.DropTable(
                 name: "BannedTwitchUsers");
 
-            //migrationBuilder.AlterColumn<long>(
-            //    name: "Id",
-            //    table: "Channels",
-            //    type: "bigint",
-            //    nullable: false,
-            //    oldClrType: typeof(long),
-            //    oldType: "bigint")
-            //    .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
+            migrationBuilder.AlterColumn<long>(
+                name: "Id",
+                table: "Channels",
+                type: "bigint",
+                nullable: false,
+                oldClrType: typeof(long),
+                oldType: "bigint")
+                .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
         }
     }
 }
