@@ -160,10 +160,12 @@ namespace TwitchEbooks
                 BannedOn = DateTime.UtcNow
             });
             context.SaveChanges();
+            await _twitchService.SendMessageAsync(e.ChannelName, $"Alrighty, I won't listen to them anymore! Gimme a moment to reticulate my splines...");
 
             // re-create the pool for the given channel
             var messages = context.Messages.Where(m => m.ChannelId == e.ChannelId).AsAsyncEnumerable();
             await _msgGenService.LoadMessagesIntoPool(e.ChannelId, messages);
+            await _twitchService.SendMessageAsync(e.ChannelName, $"Ok, I'm all set and ready to go!");
         }
     }
 }

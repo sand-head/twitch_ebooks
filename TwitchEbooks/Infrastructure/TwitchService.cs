@@ -159,7 +159,7 @@ namespace TwitchEbooks.Infrastructure
                 OnBotJoinLeaveReceivedEventArgs?.Invoke(this, new BotJoinLeaveReceivedEventArgs
                 {
                     RequestedPresence = BotPresenceRequest.Leave,
-                    ChannelId = message.UserId,
+                    ChannelId = message.RoomId,
                     ChannelName = message.Username,
                     BotChannelName = _channelName
                 });
@@ -181,7 +181,7 @@ namespace TwitchEbooks.Infrastructure
 
                 OnPurgeWordRequestReceived?.Invoke(this, new PurgeWordRequestReceivedEventArgs
                 {
-                    ChannelId = message.UserId,
+                    ChannelId = message.RoomId,
                     Word = string.Join(' ', splitMsg[1..])
                 });
             }
@@ -200,10 +200,18 @@ namespace TwitchEbooks.Infrastructure
                     return;
                 }
 
-                var user = await _apiClient.GetUserAsync(_userTokens.AccessToken, _twitchSettings.ClientId, (UserInputType.Username, splitMsg[1].Trim()));
+                var userName = splitMsg[1].Trim();
+                var user = await _apiClient.GetUserAsync(_userTokens.AccessToken, _twitchSettings.ClientId, (UserInputType.Username, userName));
+                if (user is null)
+                {
+                    await SendMessageAsync(message.ChannelName, $"@{message.Username} Couldn't find a user by the name of \"${userName}\", sorry!");
+                    return;
+                }
+
                 OnBanUserRequestReceived?.Invoke(this, new BanUserRequestReceivedEventArgs
                 {
-                    ChannelId = message.UserId,
+                    ChannelId = message.RoomId,
+                    ChannelName = message.ChannelName,
                     UserId = uint.Parse(user.Id)
                 });
             }
