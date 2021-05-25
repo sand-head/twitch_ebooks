@@ -4,9 +4,17 @@ ARG GH_USERNAME
 ARG GH_PAT
 
 # set up credprovider
-ENV NUGET_CREDENTIALPROVIDER_SESSIONTOKENCACHE_ENABLED true
-ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS "{\"endpointCredentials\": [{\"endpoint\":\"https://nuget.pkg.github.com/Anybotty/index.json\", \"username\":\"${GH_USERNAME}\", \"password\":\"${GH_PAT}\"}]}"
-RUN wget -qO- https://raw.githubusercontent.com/Microsoft/artifacts-credprovider/master/helpers/installcredprovider.sh | bash
+# ENV NUGET_CREDENTIALPROVIDER_SESSIONTOKENCACHE_ENABLED true
+# ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS "{\"endpointCredentials\": [{\"endpoint\":\"https://nuget.pkg.github.com/Anybotty/index.json\", \"username\":\"${GH_USERNAME}\", \"password\":\"${GH_PAT}\"}]}"
+# RUN wget -qO- https://raw.githubusercontent.com/Microsoft/artifacts-credprovider/master/helpers/installcredprovider.sh | bash
+
+# add NuGet source
+RUN dotnet nuget add source \
+	--username $GH_USERNAME \
+	--password $GH_PAT \
+	--store-password-in-clear-text \
+	--name github \
+	"https://nuget.pkg.github.com/Anybotty/index.json"
 
 # copy csprojs & sln and restore as distinct layers
 COPY */*.csproj ./  
