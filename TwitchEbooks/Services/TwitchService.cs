@@ -164,7 +164,7 @@ namespace TwitchEbooks.Services
             // I cannot believe TwitchLib is only *just now* adding this endpoint
             // for a library with so much community use how is it not actively supported
             var httpClient = _httpClientFactory.CreateClient();
-            var request = new HttpRequestMessage(HttpMethod.Get, "https://id.twitch.tv/oauth/validate");
+            var request = new HttpRequestMessage(HttpMethod.Get, "https://id.twitch.tv/oauth2/validate");
             request.Headers.Add("Authorization", $"OAuth {refreshResponse.AccessToken}");
             var response = await httpClient.SendAsync(request);
             var validateResponse = await response.Content.ReadFromJsonAsync<ValidateResponse>();
