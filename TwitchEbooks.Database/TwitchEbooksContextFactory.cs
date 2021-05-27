@@ -15,6 +15,7 @@ namespace TwitchEbooks.Database
                 .SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("appsettings.json")
                 .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}.json", true)
+                .AddEnvironmentVariables()
                 .Build();
 
             var builder = new DbContextOptionsBuilder();
