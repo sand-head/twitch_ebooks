@@ -109,9 +109,11 @@ namespace TwitchEbooks
                     services.AddSingleton(twitchSettings);
 
                     // Misc. dependencies
-                    services.AddMediatR(typeof(Program));
-                    services.AddHttpClient();
-                    services.AddSingleton<MessageGenerationQueue>();
+                    services
+                        .AddMediatR(typeof(Program))
+                        .AddHttpClient()
+                        .AddSingleton<MessageGenerationQueue>()
+                        .AddSingleton<IMarkovChainService, MarkovChainService>();
 
                     // TwitchLib stuff
                     services.AddSingleton<ConnectionCredentials>(services =>
@@ -141,8 +143,9 @@ namespace TwitchEbooks
                     });
 
                     // Hosted services
-                    services.AddHostedService<MessageGenerationService>();
-                    services.AddHostedService<TwitchService>();
+                    services
+                        .AddHostedService<MessageGenerationService>()
+                        .AddHostedService<TwitchService>();
                 });
     }
 }
