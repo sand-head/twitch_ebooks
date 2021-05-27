@@ -108,10 +108,9 @@ namespace TwitchEbooks2
                     var twitchSettings = context.Configuration.GetSection("Twitch").Get<TwitchSettings>();
                     services.AddSingleton(twitchSettings);
 
-                    // Misc. services
+                    // Misc. dependencies
                     services.AddMediatR(typeof(Program));
                     services.AddHttpClient();
-                    services.AddScoped<ChannelService>();
                     services.AddSingleton<MessageGenerationQueue>();
 
                     // TwitchLib stuff
@@ -141,7 +140,8 @@ namespace TwitchEbooks2
                         return client;
                     });
 
-                    // Main service
+                    // Hosted services
+                    services.AddHostedService<MessageGenerationService>();
                     services.AddHostedService<TwitchService>();
                 });
     }

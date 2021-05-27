@@ -153,7 +153,7 @@ namespace TwitchEbooks
 
             // ditch the bad messages and add the user
             context.Messages.RemoveRange(badMessages);
-            context.BannedTwitchUsers.Add(new BannedTwitchUser
+            context.IgnoredUsers.Add(new IgnoredTwitchUser
             {
                 Id = e.UserId,
                 ChannelId = e.ChannelId,

@@ -59,20 +59,17 @@ namespace TwitchEbooks2.Services
             _tokens = context.AccessTokens.OrderByDescending(a => a.CreatedOn).First();
 
             // register event handlers
+            _client.OnConnected += TwitchClient_OnConnected;
             _client.OnMessageReceived += TwitchClient_OnMessageReceived;
             _client.OnDisconnected += TwitchClient_OnDisconnected;
 
             // connect to Twitch
             _logger.LogInformation("Connecting to Twitch...");
-            if (_client.Connect())
-            {
-                _logger.LogInformation("Connected!");
-                return Task.CompletedTask;
-            }
-            else
+            if (!_client.Connect())
             {
                 throw new Exception("Could not connect client to Twitch");
             }
+            return Task.CompletedTask;
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
@@ -80,8 +77,12 @@ namespace TwitchEbooks2.Services
             _isStopping = true;
             _logger.LogInformation("Disconnecting from Twitch...");
             _client.Disconnect();
-            _logger.LogInformation("Disconnected!");
             return Task.CompletedTask;
+        }
+
+        private void TwitchClient_OnConnected(object sender, OnConnectedArgs e)
+        {
+            _logger.LogInformation("Connected!");
         }
 
         private async void TwitchClient_OnMessageReceived(object sender, OnMessageReceivedArgs e)
@@ -142,7 +143,11 @@ namespace TwitchEbooks2.Services
 
         private async void TwitchClient_OnDisconnected(object sender, OnDisconnectedEventArgs e)
         {
-            if (_isStopping) return;
+            if (_isStopping)
+            {
+                _logger.LogInformation("Disconnected!");
+                return;
+            }
 
             _logger.LogInformation("Client disconnected unexpectedly, refreshing tokens...");
             var refreshResponse = await _api.V5.Auth.RefreshAuthTokenAsync(_tokens.RefreshToken, _settings.ClientSecret);

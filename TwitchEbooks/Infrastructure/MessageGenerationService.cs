@@ -100,7 +100,7 @@ namespace TwitchEbooks.Infrastructure
             using var scope = _scopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetService<TwitchEbooksContext>();
             // if a user is banned from being included in generation, don't store their messages
-            if (context.BannedTwitchUsers.Any(b => b.ChannelId == e.Message.RoomId && b.Id == e.Message.UserId)) return;
+            if (context.IgnoredUsers.Any(b => b.ChannelId == e.Message.RoomId && b.Id == e.Message.UserId)) return;
 
             var message = new TwitchMessage
             {
