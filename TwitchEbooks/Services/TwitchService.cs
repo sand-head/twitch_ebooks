@@ -85,8 +85,7 @@ namespace TwitchEbooks.Services
 
         private void TwitchClient_OnLog(object sender, OnLogArgs e)
         {
-            // todo: make this Debug instead of Information
-            _logger.LogInformation(e.Data);
+            _logger.LogDebug(e.Data);
         }
 
         private async void TwitchClient_OnConnected(object sender, OnConnectedArgs e)
