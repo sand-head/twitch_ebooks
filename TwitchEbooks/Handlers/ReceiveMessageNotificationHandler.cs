@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
@@ -30,13 +31,18 @@ namespace TwitchEbooks.Handlers
         public async Task Handle(ReceiveMessageNotification notification, CancellationToken cancellationToken)
         {
             var message = notification.Message;
+            var channelId = uint.Parse(message.RoomId);
+            var userId = uint.Parse(message.UserId);
+
             var context = _contextFactory.CreateDbContext();
+            // obviously, don't store messages by ignored users
+            if (context.IgnoredUsers.Any(i => i.Id == userId && i.ChannelId == channelId)) return;
 
             var twitchMsg = new TwitchMessage
             {
                 Id = Guid.Parse(message.Id),
-                ChannelId = uint.Parse(message.RoomId),
-                UserId = uint.Parse(message.UserId),
+                ChannelId = channelId,
+                UserId = userId,
                 Message = message.Message,
                 ReceivedOn = DateTime.UtcNow
             };
