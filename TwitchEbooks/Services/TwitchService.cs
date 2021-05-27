@@ -63,6 +63,7 @@ namespace TwitchEbooks.Services
             _client.OnConnected += TwitchClient_OnConnected;
             _client.OnConnectionError += TwitchClient_OnConnectionError;
             _client.OnError += TwitchClient_OnError;
+            _client.OnGiftedSubscription += TwitchClient_OnGiftedSubscription;
             _client.OnMessageReceived += TwitchClient_OnMessageReceived;
             _client.OnDisconnected += TwitchClient_OnDisconnected;
 
@@ -112,12 +113,26 @@ namespace TwitchEbooks.Services
             _logger.LogError("An error occurred within the Twitch client: {Exception}", e.Exception);
         }
 
+        private async void TwitchClient_OnGiftedSubscription(object sender, OnGiftedSubscriptionArgs e)
+        {
+            var subMessage = e.GiftedSubscription;
+            var channelId = uint.Parse(subMessage.RoomId);
+
+            // if the gift sub is to a channel we're in (and it's for the bot), send the celebratory messages
+            if (_tokens.UserId == uint.Parse(subMessage.MsgParamRecipientId) && _client.JoinedChannels.Select(jc => jc.Channel).Contains(e.Channel))
+            {
+                _logger.LogInformation("We got gifted a subscription to channel {Id}!", channelId);
+                await _mediator.Publish(new SendMessageNotification(channelId, $"🎉 Thanks for the gift sub @{subMessage.DisplayName}! 🎉"));
+                await _mediator.Publish(new GenerateMessageNotification(channelId));
+            }
+        }
+
         private async void TwitchClient_OnMessageReceived(object sender, OnMessageReceivedArgs e)
         {
             var channelId = uint.Parse(e.ChatMessage.RoomId);
             var userId = uint.Parse(e.ChatMessage.UserId);
 
-            if (channelId == _tokens.UserId)
+            if (_tokens.UserId == channelId)
             {
                 // handle commands that are meant for the bot's chatroom
                 if (e.ChatMessage.Message.StartsWith("~join"))
