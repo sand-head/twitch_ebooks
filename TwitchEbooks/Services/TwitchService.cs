@@ -59,6 +59,7 @@ namespace TwitchEbooks.Services
             _tokens = context.AccessTokens.OrderByDescending(a => a.CreatedOn).First();
 
             // register event handlers
+            _client.OnLog += TwitchClient_OnLog;
             _client.OnConnected += TwitchClient_OnConnected;
             _client.OnConnectionError += TwitchClient_OnConnectionError;
             _client.OnError += TwitchClient_OnError;
@@ -80,6 +81,11 @@ namespace TwitchEbooks.Services
             _logger.LogInformation("Disconnecting from Twitch...");
             _client.Disconnect();
             return Task.CompletedTask;
+        }
+
+        private void TwitchClient_OnLog(object sender, OnLogArgs e)
+        {
+            _logger.LogDebug(e.Data);
         }
 
         private void TwitchClient_OnConnected(object sender, OnConnectedArgs e)
