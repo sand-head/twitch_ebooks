@@ -61,6 +61,7 @@ namespace TwitchEbooks.Services
             // register event handlers
             _client.OnConnected += TwitchClient_OnConnected;
             _client.OnConnectionError += TwitchClient_OnConnectionError;
+            _client.OnError += TwitchClient_OnError;
             _client.OnMessageReceived += TwitchClient_OnMessageReceived;
             _client.OnDisconnected += TwitchClient_OnDisconnected;
 
@@ -81,15 +82,20 @@ namespace TwitchEbooks.Services
             return Task.CompletedTask;
         }
 
+        private void TwitchClient_OnConnected(object sender, OnConnectedArgs e)
+        {
+            _logger.LogInformation("Connected!");
+        }
+
         private void TwitchClient_OnConnectionError(object sender, OnConnectionErrorArgs e)
         {
             _logger.LogError("An error occurred while trying to connect {Username} to Twitch: {Message}", e.BotUsername, e.Error.Message);
             // todo: do stuff to fix this
         }
 
-        private void TwitchClient_OnConnected(object sender, OnConnectedArgs e)
+        private void TwitchClient_OnError(object sender, OnErrorEventArgs e)
         {
-            _logger.LogInformation("Connected!");
+            _logger.LogError("An error occurred within the Twitch client: {Exception}", e.Exception);
         }
 
         private async void TwitchClient_OnMessageReceived(object sender, OnMessageReceivedArgs e)
