@@ -85,12 +85,21 @@ namespace TwitchEbooks.Services
 
         private void TwitchClient_OnLog(object sender, OnLogArgs e)
         {
+            // todo: make this Debug instead of Information
             _logger.LogInformation(e.Data);
         }
 
-        private void TwitchClient_OnConnected(object sender, OnConnectedArgs e)
+        private async void TwitchClient_OnConnected(object sender, OnConnectedArgs e)
         {
             _logger.LogInformation("Connected!");
+            var context = _contextFactory.CreateDbContext();
+
+            var usersResponse = await _api.Helix.Users.GetUsersAsync(ids: context.Channels.Select(c => c.Id.ToString()).ToList());
+            foreach (var user in usersResponse.Users)
+            {
+                _logger.LogInformation("Joining channel {Id}...", user.Id);
+                _client.JoinChannel(user.Login);
+            }
         }
 
         private void TwitchClient_OnConnectionError(object sender, OnConnectionErrorArgs e)
