@@ -47,7 +47,8 @@ namespace TwitchEbooks.Handlers
                 BannedOn = DateTime.UtcNow
             });
             context.SaveChanges();
-            await _mediator.Publish(new SendMessageNotification(channelId, "Alrighty, I won't listen to them anymore! Gimme a moment to reticulate my splines..."));
+            _logger.LogInformation("Now ignoring user {UserId} for channel {ChannelId}.", userId, channelId);
+            await _mediator.Publish(new SendMessageNotification(channelId, "Alrighty, I won't listen to them anymore! Gimme a moment to reticulate my splines..."), cancellationToken);
 
             // re-create the chain for the given channel
             var messages = context.Messages.Where(m => m.ChannelId == channelId).AsAsyncEnumerable();

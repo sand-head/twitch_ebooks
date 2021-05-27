@@ -35,6 +35,7 @@ namespace TwitchEbooks.Handlers
             }
 
             _client.SendMessage(channelName, message);
+            _logger.LogInformation("Sent message to channel {Id}.", channelId);
         }
 
         private async Task<string> GetChannelNameById(uint channelId)
