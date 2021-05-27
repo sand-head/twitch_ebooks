@@ -146,6 +146,7 @@ namespace TwitchEbooks
                     services
                         .AddHostedService<MessageGenerationService>()
                         .AddHostedService<TwitchService>();
-                });
+                })
+                .UseSerilog();
     }
 }

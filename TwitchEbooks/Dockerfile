@@ -12,7 +12,7 @@ COPY . .
 RUN dotnet publish "TwitchEbooks/TwitchEbooks.csproj" -c release -o /app --no-restore
 
 # final stage/image
-FROM mcr.microsoft.com/dotnet/aspnet:5.0-alpine
+FROM mcr.microsoft.com/dotnet/aspnet:5.0
 WORKDIR /app
 COPY --from=build /app .
 EXPOSE 80
