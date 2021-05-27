@@ -9,3 +9,5 @@ There are various commands that may be used in either the bot's chat or a user's
 ### User's Chat Commands
 1. `~generate`: The bot uses previously submitted chat messages to generate a new message, and then sends it in chat.
 2. `~leave`: Also makes the bot leave your chat, and can only be used by the broadcaster themselves.
+3. `~ignore [username]`: Ignores a given user, deleting all their previous messages from the database.
+4. `~purge [word]`: Removes all messages with a given word from the database.
