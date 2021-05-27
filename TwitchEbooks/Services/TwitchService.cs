@@ -85,7 +85,7 @@ namespace TwitchEbooks.Services
 
         private void TwitchClient_OnLog(object sender, OnLogArgs e)
         {
-            _logger.LogDebug(e.Data);
+            _logger.LogInformation(e.Data);
         }
 
         private void TwitchClient_OnConnected(object sender, OnConnectedArgs e)
@@ -168,6 +168,9 @@ namespace TwitchEbooks.Services
                 return;
             }
 
+            // wait until it's *really* disconnected
+            while (_client.IsConnected) { }
+
             _logger.LogInformation("Client disconnected unexpectedly, refreshing tokens...");
             var refreshResponse = await _api.V5.Auth.RefreshAuthTokenAsync(_tokens.RefreshToken, _settings.ClientSecret);
             var createdOn = DateTime.UtcNow;
@@ -181,19 +184,23 @@ namespace TwitchEbooks.Services
             var response = await httpClient.SendAsync(request);
             var validateResponse = await response.Content.ReadFromJsonAsync<ValidateResponse>();
 
+            // save new tokens to database
+            using (var context = _contextFactory.CreateDbContext()) {
+                context.AccessTokens.Add(new UserAccessToken
+                {
+                    UserId = _tokens.UserId,
+                    AccessToken = refreshResponse.AccessToken,
+                    RefreshToken = refreshResponse.RefreshToken,
+                    ExpiresIn = refreshResponse.ExpiresIn,
+                    CreatedOn = createdOn
+                });
+                await context.SaveChangesAsync();
+            }
+
             // set API access token and new credentials and reconnect to chat
             _api.Settings.AccessToken = refreshResponse.AccessToken;
             _client.SetConnectionCredentials(new ConnectionCredentials(validateResponse.Login, refreshResponse.AccessToken));
             _client.Connect();
-
-            await _mediator.Publish(new RefreshedTokensNotification(new UserAccessToken
-            {
-                UserId = _tokens.UserId,
-                AccessToken = refreshResponse.AccessToken,
-                RefreshToken = refreshResponse.RefreshToken,
-                ExpiresIn = refreshResponse.ExpiresIn,
-                CreatedOn = createdOn
-            }));
         }
     }
 }

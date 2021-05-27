@@ -6,9 +6,11 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using System;
 using System.Linq;
-using System.Net;
+using System.Net.Http;
+using System.Net.Http.Json;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
+using TwitchEbooks.Database.Models;
 using TwitchEbooks.Infrastructure;
 using TwitchEbooks.Models;
 using TwitchEbooks.Services;
@@ -45,6 +47,108 @@ namespace TwitchEbooks
             }
         }
 
+        static IHostBuilder CreateHostBuilder(string[] args) =>
+            Host.CreateDefaultBuilder(args)
+                .ConfigureServices((context, services) =>
+                {
+                    // Database context
+                    services.AddDbContext<TwitchEbooksContext>(options =>
+                        options.UseNpgsql(context.Configuration.GetConnectionString("PostgreSQL")),
+                        optionsLifetime: ServiceLifetime.Transient);
+                    services.AddDbContextFactory<TwitchEbooksContext, TwitchEbooksContextFactory>();
+
+                    // Configuration
+                    var twitchSettings = context.Configuration.GetSection("Twitch").Get<TwitchSettings>();
+                    services.AddSingleton(twitchSettings);
+
+                    // Misc. dependencies
+                    services
+                        .AddMediatR(typeof(Program))
+                        .AddHttpClient()
+                        .AddSingleton<MessageGenerationQueue>()
+                        .AddSingleton<IMarkovChainService, MarkovChainService>();
+
+                    // TwitchLib stuff
+                    services
+                        .AddSingleton<TwitchAPI>(services =>
+                        {
+                            var context = services.CreateScope().ServiceProvider.GetRequiredService<TwitchEbooksContext>();
+                            var tokens = context.AccessTokens.OrderByDescending(a => a.CreatedOn).First();
+
+                            var api = new TwitchAPI();
+                            api.Settings.AccessToken = tokens.AccessToken;
+                            api.Settings.ClientId = twitchSettings.ClientId;
+
+                            return api;
+                        })
+                        .AddSingleton<ConnectionCredentials>(services =>
+                        {
+                            var httpClient = services.GetRequiredService<IHttpClientFactory>().CreateClient();
+                            var context = services.CreateScope().ServiceProvider.GetRequiredService<TwitchEbooksContext>();
+                            var tokens = context.AccessTokens.OrderByDescending(a => a.CreatedOn).First();
+
+                            // manually validate tokens
+                            // I cannot believe TwitchLib is only *just now* adding this endpoint
+                            // for a library with so much community use how is it not actively supported
+                            var request = new HttpRequestMessage(HttpMethod.Get, "https://id.twitch.tv/oauth2/validate");
+                            request.Headers.Add("Authorization", $"OAuth {tokens.AccessToken}");
+                            var response = httpClient.SendAsync(request).GetAwaiter().GetResult();
+
+                            if (!response.IsSuccessStatusCode)
+                            {
+                                Log.Information("Refreshing tokens...");
+                                var api = services.GetRequiredService<TwitchAPI>();
+                                var settings = services.GetRequiredService<TwitchSettings>();
+                                var refreshResponse = api.V5.Auth.RefreshAuthTokenAsync(tokens.RefreshToken, settings.ClientSecret).GetAwaiter().GetResult();
+                                var createdOn = DateTime.UtcNow;
+
+                                tokens = new UserAccessToken
+                                {
+                                    UserId = tokens.UserId,
+                                    AccessToken = refreshResponse.AccessToken,
+                                    RefreshToken = refreshResponse.RefreshToken,
+                                    ExpiresIn = refreshResponse.ExpiresIn,
+                                    CreatedOn = createdOn
+                                };
+
+                                api.Settings.AccessToken = tokens.AccessToken;
+                                context.AccessTokens.Add(tokens);
+                                context.SaveChanges();
+                                Log.Information("Tokens refreshed!");
+                            }
+
+                            return new ConnectionCredentials(twitchSettings.BotUsername, tokens.AccessToken);
+                        })
+                        .AddSingleton<TwitchClient>(services =>
+                        {
+                            var client = new TwitchClient();
+                            client.Initialize(services.GetRequiredService<ConnectionCredentials>());
+
+                            return client;
+                        });
+
+                    // Hosted services
+                    services
+                        .AddHostedService<MessageGenerationService>()
+                        .AddHostedService<TwitchService>();
+                })
+                .UseSerilog();
+
+        static void MigrateDatabase(IHost host)
+        {
+            using var scope = host.Services.CreateScope();
+
+            try
+            {
+                var context = scope.ServiceProvider.GetRequiredService<TwitchEbooksContext>();
+                context.Database.Migrate();
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "An error occurred migrating the database: {Message}", ex.Message);
+            }
+        }
+
         static async Task StartWebHostIfFirstRunAsync(IHost host)
         {
             using var scope = host.Services.CreateScope();
@@ -78,75 +182,5 @@ namespace TwitchEbooks
                 throw new Exception("No access tokens were found in the database.");
             }
         }
-
-        static void MigrateDatabase(IHost host)
-        {
-            using var scope = host.Services.CreateScope();
-
-            try
-            {
-                var context = scope.ServiceProvider.GetRequiredService<TwitchEbooksContext>();
-                context.Database.Migrate();
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "An error occurred migrating the database: {Message}", ex.Message);
-            }
-        }
-
-        static IHostBuilder CreateHostBuilder(string[] args) =>
-            Host.CreateDefaultBuilder(args)
-                .ConfigureServices((context, services) =>
-                {
-                    // Database context
-                    services.AddDbContext<TwitchEbooksContext>(options =>
-                        options.UseNpgsql(context.Configuration.GetConnectionString("PostgreSQL")),
-                        optionsLifetime: ServiceLifetime.Transient);
-                    services.AddDbContextFactory<TwitchEbooksContext, TwitchEbooksContextFactory>();
-
-                    // Configuration
-                    var twitchSettings = context.Configuration.GetSection("Twitch").Get<TwitchSettings>();
-                    services.AddSingleton(twitchSettings);
-
-                    // Misc. dependencies
-                    services
-                        .AddMediatR(typeof(Program))
-                        .AddHttpClient()
-                        .AddSingleton<MessageGenerationQueue>()
-                        .AddSingleton<IMarkovChainService, MarkovChainService>();
-
-                    // TwitchLib stuff
-                    services.AddSingleton<ConnectionCredentials>(services =>
-                    {
-                        var context = services.CreateScope().ServiceProvider.GetRequiredService<TwitchEbooksContext>();
-                        var tokens = context.AccessTokens.OrderByDescending(a => a.CreatedOn).First();
-
-                        return new ConnectionCredentials(twitchSettings.BotUsername, tokens.AccessToken);
-                    });
-                    services.AddSingleton<TwitchAPI>(services =>
-                    {
-                        var context = services.CreateScope().ServiceProvider.GetRequiredService<TwitchEbooksContext>();
-                        var tokens = context.AccessTokens.OrderByDescending(a => a.CreatedOn).First();
-
-                        var api = new TwitchAPI();
-                        api.Settings.AccessToken = tokens.AccessToken;
-                        api.Settings.ClientId = twitchSettings.ClientId;
-
-                        return api;
-                    });
-                    services.AddSingleton<TwitchClient>(services =>
-                    {
-                        var client = new TwitchClient();
-                        client.Initialize(services.GetRequiredService<ConnectionCredentials>());
-
-                        return client;
-                    });
-
-                    // Hosted services
-                    services
-                        .AddHostedService<MessageGenerationService>()
-                        .AddHostedService<TwitchService>();
-                })
-                .UseSerilog();
     }
 }

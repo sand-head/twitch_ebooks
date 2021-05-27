@@ -10,6 +10,5 @@ namespace TwitchEbooks.Models.Notifications
     public record LeaveNotification(uint ChannelId) : INotification;
     public record PurgeWordNotification(uint ChannelId, string Word) : INotification;
     public record ReceiveMessageNotification(ChatMessage Message) : INotification;
-    public record RefreshedTokensNotification(UserAccessToken Tokens) : INotification;
     public record SendMessageNotification(uint ChannelId, string Message) : INotification;
 }
