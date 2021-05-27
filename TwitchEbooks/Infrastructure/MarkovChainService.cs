@@ -8,7 +8,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
 
-namespace TwitchEbooks2.Infrastructure
+namespace TwitchEbooks.Infrastructure
 {
     public interface IMarkovChainService
     {

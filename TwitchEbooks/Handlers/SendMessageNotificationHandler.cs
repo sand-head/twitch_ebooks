@@ -4,11 +4,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using TwitchEbooks2.Models.Notifications;
+using TwitchEbooks.Models.Notifications;
 using TwitchLib.Api;
 using TwitchLib.Client;
 
-namespace TwitchEbooks2.Handlers
+namespace TwitchEbooks.Handlers
 {
     public class SendMessageNotificationHandler : INotificationHandler<SendMessageNotification>
     {

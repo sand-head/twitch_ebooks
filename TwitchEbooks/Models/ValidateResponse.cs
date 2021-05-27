@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace TwitchEbooks2.Models
+namespace TwitchEbooks.Models
 {
     public class ValidateResponse
     {

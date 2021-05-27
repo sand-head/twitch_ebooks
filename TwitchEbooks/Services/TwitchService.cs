@@ -11,15 +11,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
 using TwitchEbooks.Database.Models;
-using TwitchEbooks2.Models;
-using TwitchEbooks2.Models.Notifications;
+using TwitchEbooks.Models;
+using TwitchEbooks.Models.Notifications;
 using TwitchLib.Api;
 using TwitchLib.Client;
 using TwitchLib.Client.Events;
 using TwitchLib.Client.Models;
 using TwitchLib.Communication.Events;
 
-namespace TwitchEbooks2.Services
+namespace TwitchEbooks.Services
 {
     public class TwitchService : IHostedService
     {

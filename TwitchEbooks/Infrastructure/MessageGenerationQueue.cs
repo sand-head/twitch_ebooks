@@ -2,7 +2,7 @@
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
-namespace TwitchEbooks2.Infrastructure
+namespace TwitchEbooks.Infrastructure
 {
     public class MessageGenerationQueue
     {

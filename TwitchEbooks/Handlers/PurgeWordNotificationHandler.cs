@@ -5,10 +5,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
-using TwitchEbooks2.Infrastructure;
-using TwitchEbooks2.Models.Notifications;
+using TwitchEbooks.Infrastructure;
+using TwitchEbooks.Models.Notifications;
 
-namespace TwitchEbooks2.Handlers
+namespace TwitchEbooks.Handlers
 {
     public class PurgeWordNotificationHandler : INotificationHandler<PurgeWordNotification>
     {

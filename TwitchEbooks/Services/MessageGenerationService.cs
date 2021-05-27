@@ -6,9 +6,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
-using TwitchEbooks2.Models.Notifications;
+using TwitchEbooks.Models.Notifications;
 
-namespace TwitchEbooks2.Infrastructure
+namespace TwitchEbooks.Infrastructure
 {
     public class MessageGenerationService : BackgroundService
     {

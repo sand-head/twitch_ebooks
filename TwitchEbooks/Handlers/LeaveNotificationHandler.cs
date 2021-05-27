@@ -1,30 +1,29 @@
 ﻿using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
 using TwitchEbooks.Database.Models;
-using TwitchEbooks2.Infrastructure;
-using TwitchEbooks2.Models.Notifications;
+using TwitchEbooks.Infrastructure;
+using TwitchEbooks.Models.Notifications;
 using TwitchLib.Api;
 using TwitchLib.Client;
 
-namespace TwitchEbooks2.Handlers
+namespace TwitchEbooks.Handlers
 {
-    public class JoinNotificationHandler : INotificationHandler<JoinNotification>
+    public class LeaveNotificationHandler : INotificationHandler<LeaveNotification>
     {
-        private readonly ILogger<JoinNotificationHandler> _logger;
+        private readonly ILogger<LeaveNotificationHandler> _logger;
         private readonly IDbContextFactory<TwitchEbooksContext> _contextFactory;
         private readonly IMarkovChainService _chainService;
         private readonly TwitchAPI _twitchApi;
         private readonly TwitchClient _twitchClient;
 
-        public JoinNotificationHandler(
-            ILogger<JoinNotificationHandler> logger,
+        public LeaveNotificationHandler(
+            ILogger<LeaveNotificationHandler> logger,
             IDbContextFactory<TwitchEbooksContext> contextFactory,
             IMarkovChainService chainService,
             TwitchAPI twitchApi,
@@ -37,29 +36,31 @@ namespace TwitchEbooks2.Handlers
             _twitchClient = twitchClient;
         }
 
-        public async Task Handle(JoinNotification notification, CancellationToken cancellationToken)
+        public async Task Handle(LeaveNotification notification, CancellationToken cancellationToken)
         {
             var context = _contextFactory.CreateDbContext();
-            if (context.Channels.Any(c => c.Id == notification.ChannelId))
+            var channel = context.Channels.FirstOrDefault(c => c.Id == notification.ChannelId);
+            if (channel is null)
                 return;
 
+            // disconnect from channel on Twitch
             // make sure a user exists on Twitch first
             var usersResponse = await _twitchApi.Helix.Users.GetUsersAsync(ids: new List<string> { notification.ChannelId.ToString() });
-            if (usersResponse.Users.Length != 1)
-                throw new Exception("No Twitch user could be found by that ID");
-            var user = usersResponse.Users[0];
+            if (usersResponse.Users.Length == 1)
+            {
+                var user = usersResponse.Users[0];
+                _twitchClient.LeaveChannel(user.Login);
+            }
 
-            // add channel to database
+            // remove channel from database
             context.Channels.Add(new TwitchChannel
             {
                 Id = notification.ChannelId
             });
             await context.SaveChangesAsync(cancellationToken);
 
-            // connect to channel on Twitch client
-            _twitchClient.JoinChannel(user.Login);
-            // also create a Markov chain
-            await _chainService.AddOrUpdateChainForChannel(notification.ChannelId);
+            // also remove their Markov chain
+            _chainService.RemoveChainForChannel(notification.ChannelId);
         }
     }
 }

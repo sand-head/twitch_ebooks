@@ -2,7 +2,7 @@
 using TwitchEbooks.Database.Models;
 using TwitchLib.Client.Models;
 
-namespace TwitchEbooks2.Models.Notifications
+namespace TwitchEbooks.Models.Notifications
 {
     public record GenerateMessageNotification(uint ChannelId) : INotification;
     public record IgnoreUserNotification(uint ChannelId, uint UserId) : INotification;
