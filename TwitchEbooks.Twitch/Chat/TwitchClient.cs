@@ -159,7 +159,7 @@ namespace TwitchEbooks.Twitch.Chat
 
                     if (result.EndOfMessage)
                     {
-                        foreach (var message in messages.Trim().Split('\n'))
+                        foreach (var message in messages.Trim().Replace("\r", string.Empty).Split('\n'))
                         {
                             var twitchMessage = IrcMessageParser.TryParse(message, out var ircMessage)
                                 ? ircMessage.ToTwitchMessage()
