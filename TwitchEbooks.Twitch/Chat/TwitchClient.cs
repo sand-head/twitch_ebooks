@@ -30,7 +30,10 @@ namespace TwitchEbooks.Twitch.Chat
         {
             _client = new ClientWebSocket();
             _tokenSource = new CancellationTokenSource();
-            _incomingMessageQueue = Channel.CreateUnbounded<TwitchMessage>();
+            _incomingMessageQueue = Channel.CreateUnbounded<TwitchMessage>(new UnboundedChannelOptions
+            {
+                SingleWriter = true
+            });
         }
 
         public bool IsConnected => _client.State == WebSocketState.Open;
@@ -97,14 +100,14 @@ namespace TwitchEbooks.Twitch.Chat
             }
         }
 
-        public async Task<TMessage> ReadMessageAsync<TMessage>(CancellationToken token = default) where TMessage : TwitchMessage
+        public async Task<TMessage> ReadMessageAsync<TMessage>(Predicate<TMessage> predicate = default, CancellationToken token = default) where TMessage : TwitchMessage
         {
             using var comboToken = CancellationTokenSource.CreateLinkedTokenSource(_tokenSource.Token, token);
 
             while (IsConnected && !comboToken.Token.IsCancellationRequested)
             {
                 var message = await _incomingMessageQueue.Reader.ReadAsync(token);
-                if (message is TMessage tMessage)
+                if (message is TMessage tMessage && (predicate is null || predicate(tMessage)))
                     return tMessage;
             }
 
