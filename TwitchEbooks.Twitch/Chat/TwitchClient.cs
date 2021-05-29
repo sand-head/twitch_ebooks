@@ -132,6 +132,7 @@ namespace TwitchEbooks.Twitch.Chat
                         ? ircMessage.ToTwitchMessage()
                         : throw new Exception("Could not parse IrcMessage from received input.");
 
+                    OnLog?.Invoke(this, $"Received: {twitchMessage}");
                     // do some fun things internally so consumers don't have to deal with them
                     if (twitchMessage is TwitchMessage.Ping)
                         await SendRawMessageAsync("PONG");
