@@ -23,7 +23,7 @@ namespace TwitchEbooks.Twitch.Extensions
                         GiftMonths: ircMessage.Tags.ContainsKey("msg-param-gift-months")
                             ? int.Parse(ircMessage.Tags["msg-param-gift-months"])
                             : 1,
-                        Message: ircMessage.Tags["system-msg"],
+                        Message: ircMessage.Tags["system-msg"].Replace("\\s", " "),
                         RecipientDisplayName: ircMessage.Tags["msg-param-recipient-display-name"],
                         RecipientId: uint.Parse(ircMessage.Tags["msg-param-recipient-id"]),
                         RecipientUserName: ircMessage.Tags["msg-param-recipient-user-name"],

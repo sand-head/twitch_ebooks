@@ -159,11 +159,17 @@ namespace TwitchEbooks.Twitch.Chat
 
                     if (result.EndOfMessage)
                     {
-                        foreach (var message in messages.Split('\n'))
+                        foreach (var message in messages.Trim().Split('\n'))
                         {
                             var twitchMessage = IrcMessageParser.TryParse(message, out var ircMessage)
                                 ? ircMessage.ToTwitchMessage()
-                                : throw new Exception("Could not parse IrcMessage from received input.");
+                                : null;
+
+                            if (twitchMessage is null)
+                            {
+                                OnLog?.Invoke(this, $"Received weird message: {message}");
+                                continue;
+                            }
 
                             OnLog?.Invoke(this, $"Received: {twitchMessage}");
                             // do some fun things internally so consumers don't have to deal with them
@@ -174,10 +180,7 @@ namespace TwitchEbooks.Twitch.Chat
                             else if (twitchMessage is TwitchMessage.Leave leaveMsg && _username == leaveMsg.Username)
                                 _joinedChannels.Remove(leaveMsg.Channel);
 
-                            if (twitchMessage is not null)
-                                await _incomingMessageQueue.Writer.WriteAsync(twitchMessage, _tokenSource.Token);
-
-                            OnLog?.Invoke(this, $"Received weird message: {message}");
+                            await _incomingMessageQueue.Writer.WriteAsync(twitchMessage, _tokenSource.Token);
                         }
                         messages = "";
                     }
