@@ -111,8 +111,8 @@ namespace TwitchEbooks.Services
                         case TwitchMessage.GiftSub giftSub:
                             await TwitchClient_OnGiftedSubscription(giftSub);
                             break;
-                        case TwitchMessage.Leave leave:
-                            _logger.LogInformation("{User} has left channel {Channel}.", leave.Username, leave.Channel);
+                        case TwitchMessage.Part part:
+                            _logger.LogInformation("{User} has left channel {Channel}.", part.Username, part.Channel);
                             break;
                     }
                 }

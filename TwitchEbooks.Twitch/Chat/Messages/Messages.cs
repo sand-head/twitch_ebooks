@@ -12,7 +12,7 @@ namespace TwitchEbooks.Twitch.Chat.Messages
         public record Join(
             string Channel,
             string Username) : TwitchMessage;
-        public record Leave(
+        public record Part(
             string Channel,
             string Username) : TwitchMessage;
         public record Chat(

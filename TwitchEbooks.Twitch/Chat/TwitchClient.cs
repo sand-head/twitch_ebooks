@@ -177,8 +177,8 @@ namespace TwitchEbooks.Twitch.Chat
                                 await SendRawMessageAsync("PONG");
                             else if (twitchMessage is TwitchMessage.Join joinMsg && _username == joinMsg.Username)
                                 _joinedChannels.Add(joinMsg.Channel);
-                            else if (twitchMessage is TwitchMessage.Leave leaveMsg && _username == leaveMsg.Username)
-                                _joinedChannels.Remove(leaveMsg.Channel);
+                            else if (twitchMessage is TwitchMessage.Part partMsg && _username == partMsg.Username)
+                                _joinedChannels.Remove(partMsg.Channel);
 
                             await _incomingMessageQueue.Writer.WriteAsync(twitchMessage, _tokenSource.Token);
                         }

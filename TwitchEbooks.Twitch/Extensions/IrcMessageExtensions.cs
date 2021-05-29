@@ -14,6 +14,9 @@ namespace TwitchEbooks.Twitch.Extensions
                 "JOIN" => new TwitchMessage.Join(
                     Channel: ircMessage.Parameters[0][1..],
                     Username: ircMessage.Source[..ircMessage.Source.IndexOf('!')]),
+                "PART" => new TwitchMessage.Part(
+                    Channel: ircMessage.Parameters[0][1..],
+                    Username: ircMessage.Source[..ircMessage.Source.IndexOf('!')]),
                 "PRIVMSG" => ToChatMessage(ircMessage),
                 "USERNOTICE" => ircMessage.Tags["msg-id"] switch
                 {
