@@ -52,36 +52,39 @@ namespace TwitchEbooks.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            var context = _contextFactory.CreateDbContext();
-            // get and keep the latest auth tokens
-            _tokens = context.AccessTokens.OrderByDescending(a => a.CreatedOn).First();
-
-            // validate our tokens and refresh if necessary
-            var api = _apiFactory.CreateApiClient();
-            var response = await api.VerifyAccessTokenAsync(_tokens.AccessToken);
-            if (response is null)
+            using (var context = _contextFactory.CreateDbContext())
             {
-                _logger.LogInformation("Refreshing tokens...");
-                var refreshResponse = await api.RefreshTokensAsync(_tokens.RefreshToken, _settings.ClientId, _settings.ClientSecret);
-                var createdOn = DateTime.UtcNow;
+                // get and keep the latest auth tokens
+                _tokens = context.AccessTokens.OrderByDescending(a => a.CreatedOn).First();
 
-                _tokens = new Database.Models.UserAccessToken
+                // validate our tokens and refresh if necessary
+                var api = _apiFactory.CreateApiClient();
+                var response = await api.VerifyAccessTokenAsync(_tokens.AccessToken);
+                if (response is null)
                 {
-                    UserId = _tokens.UserId,
-                    AccessToken = refreshResponse.AccessToken,
-                    RefreshToken = refreshResponse.RefreshToken,
-                    ExpiresIn = refreshResponse.ExpiresIn,
-                    CreatedOn = createdOn
-                };
+                    _logger.LogInformation("Refreshing tokens...");
+                    var refreshResponse = await api.RefreshTokensAsync(_tokens.RefreshToken, _settings.ClientId, _settings.ClientSecret);
+                    var createdOn = DateTime.UtcNow;
 
-                // api.Settings.AccessToken = tokens.AccessToken;
-                context.AccessTokens.Add(_tokens);
-                context.SaveChanges();
-                _logger.LogInformation("Tokens refreshed!");
+                    _tokens = new Database.Models.UserAccessToken
+                    {
+                        UserId = _tokens.UserId,
+                        AccessToken = refreshResponse.AccessToken,
+                        RefreshToken = refreshResponse.RefreshToken,
+                        ExpiresIn = refreshResponse.ExpiresIn,
+                        CreatedOn = createdOn
+                    };
+
+                    // api.Settings.AccessToken = tokens.AccessToken;
+                    context.AccessTokens.Add(_tokens);
+                    context.SaveChanges();
+                    _logger.LogInformation("Tokens refreshed!");
+                }
             }
 
             // hook up events
             _client.OnDisconnected += TwitchClient_OnDisconnected;
+            _client.OnLog += TwitchClient_OnLog;
 
             // connect to Twitch
             _logger.LogInformation("Connecting to Twitch...");
@@ -115,6 +118,11 @@ namespace TwitchEbooks.Services
             _isStopping = true;
             _logger.LogInformation("Disconnecting from Twitch...");
             _client.Disconnect();
+        }
+
+        private void TwitchClient_OnLog(object sender, string e)
+        {
+            _logger.LogInformation(e);
         }
 
         private async Task TwitchClient_OnConnected()

@@ -32,6 +32,7 @@ namespace TwitchEbooks.Twitch.Chat
         public IReadOnlyList<string> JoinedChannels => _joinedChannels;
 
         public event EventHandler<OnDisconnectedEventArgs> OnDisconnected;
+        public event EventHandler<string> OnLog;
 
         public async Task ConnectAsync(string username, string accessToken, string serverUri = "wss://irc-ws.chat.twitch.tv:443", CancellationToken token = default)
         {
@@ -86,7 +87,7 @@ namespace TwitchEbooks.Twitch.Chat
             }
             catch (Exception e)
             {
-                // OnLog?.Invoke("Exception occured when sending WebSocket message {Message}: {Error}", message, e.Message);
+                OnLog?.Invoke(this, $"Exception occured when sending WebSocket message {message}: {e.Message}");
             }
         }
 
@@ -139,10 +140,10 @@ namespace TwitchEbooks.Twitch.Chat
                     else if (twitchMessage is TwitchMessage.Leave leaveMsg && _username == leaveMsg.Username)
                         _joinedChannels.Remove(leaveMsg.Channel);
 
-                    if (twitchMessage is null)
-                        message = "";
-                    else
-                        return twitchMessage;
+                    if (twitchMessage is not null) return twitchMessage;
+
+                    OnLog?.Invoke(this, $"Received weird message: {message}");
+                    message = "";
                 }
             }
 
