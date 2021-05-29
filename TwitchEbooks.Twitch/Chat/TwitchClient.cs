@@ -103,7 +103,7 @@ namespace TwitchEbooks.Twitch.Chat
 
             while (IsConnected && !comboToken.Token.IsCancellationRequested)
             {
-                var message = await ReadMessageAsync(token);
+                var message = await _incomingMessageQueue.Reader.ReadAsync(token);
                 if (message is TMessage tMessage)
                     return tMessage;
             }

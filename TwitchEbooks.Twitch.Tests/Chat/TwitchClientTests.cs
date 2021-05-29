@@ -17,15 +17,9 @@ namespace TwitchEbooks.Twitch.Tests.Chat
             TwitchMessage.Join join = null;
             async Task ReadLoop()
             {
-                while (client.IsConnected)
+                while (client.IsConnected && join is null)
                 {
-                    var message = await client.ReadMessageAsync();
-                    Console.WriteLine("Message received");
-                    if (message is TwitchMessage.Join joinMsg)
-                    {
-                        join = joinMsg;
-                        break;
-                    }
+                    join = await client.ReadMessageAsync<TwitchMessage.Join>();
                 }
             }
 
@@ -50,15 +44,9 @@ namespace TwitchEbooks.Twitch.Tests.Chat
             TwitchMessage.GiftSub giftSub = null;
             async Task ReadLoop()
             {
-                while (client.IsConnected)
+                while (client.IsConnected && giftSub is null)
                 {
-                    var message = await client.ReadMessageAsync();
-                    Console.WriteLine("Message received");
-                    if (message is TwitchMessage.GiftSub giftSubMsg)
-                    {
-                        giftSub = giftSubMsg;
-                        break;
-                    }
+                    giftSub = await client.ReadMessageAsync<TwitchMessage.GiftSub>();
                 }
             }
 
