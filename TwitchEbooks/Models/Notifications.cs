@@ -1,6 +1,5 @@
 ﻿using MediatR;
-using TwitchEbooks.Database.Models;
-using TwitchLib.Client.Models;
+using TwitchEbooks.Twitch.Chat.Messages;
 
 namespace TwitchEbooks.Models.Notifications
 {
@@ -9,6 +8,6 @@ namespace TwitchEbooks.Models.Notifications
     public record JoinNotification(uint ChannelId) : INotification;
     public record LeaveNotification(uint ChannelId) : INotification;
     public record PurgeWordNotification(uint ChannelId, string Word) : INotification;
-    public record ReceiveMessageNotification(ChatMessage Message) : INotification;
+    public record ReceiveMessageNotification(TwitchMessage.Chat Message) : INotification;
     public record SendMessageNotification(uint ChannelId, string Message) : INotification;
 }

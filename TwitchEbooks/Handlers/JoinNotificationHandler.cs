@@ -9,9 +9,10 @@ using System.Threading.Tasks;
 using TwitchEbooks.Database;
 using TwitchEbooks.Database.Models;
 using TwitchEbooks.Infrastructure;
+using TwitchEbooks.Models;
 using TwitchEbooks.Models.Notifications;
-using TwitchLib.Api;
-using TwitchLib.Client;
+using TwitchEbooks.Twitch.Api;
+using TwitchEbooks.Twitch.Chat;
 
 namespace TwitchEbooks.Handlers
 {
@@ -20,21 +21,24 @@ namespace TwitchEbooks.Handlers
         private readonly ILogger<JoinNotificationHandler> _logger;
         private readonly IDbContextFactory<TwitchEbooksContext> _contextFactory;
         private readonly IMarkovChainService _chainService;
-        private readonly TwitchAPI _twitchApi;
+        private readonly TwitchApi _twitchApi;
         private readonly TwitchClient _twitchClient;
+        private readonly TwitchSettings _twitchSettings;
 
         public JoinNotificationHandler(
             ILogger<JoinNotificationHandler> logger,
             IDbContextFactory<TwitchEbooksContext> contextFactory,
             IMarkovChainService chainService,
-            TwitchAPI twitchApi,
-            TwitchClient twitchClient)
+            TwitchApi twitchApi,
+            TwitchClient twitchClient,
+            TwitchSettings twitchSettings)
         {
             _logger = logger;
             _contextFactory = contextFactory;
             _chainService = chainService;
             _twitchApi = twitchApi;
             _twitchClient = twitchClient;
+            _twitchSettings = twitchSettings;
         }
 
         public async Task Handle(JoinNotification notification, CancellationToken cancellationToken)
@@ -44,7 +48,8 @@ namespace TwitchEbooks.Handlers
                 return;
 
             // make sure a user exists on Twitch first
-            var usersResponse = await _twitchApi.Helix.Users.GetUsersAsync(ids: new List<string> { notification.ChannelId.ToString() });
+            var tokens = context.AccessTokens.OrderByDescending(t => t.CreatedOn).First();
+            var usersResponse = await _twitchApi.GetUsersAsync(tokens.AccessToken, _twitchSettings.ClientId, ids: new List<string> { notification.ChannelId.ToString() });
             if (usersResponse.Users.Length != 1)
                 throw new Exception("No Twitch user could be found by that ID");
             var user = usersResponse.Users[0];
@@ -57,7 +62,7 @@ namespace TwitchEbooks.Handlers
             await context.SaveChangesAsync(cancellationToken);
 
             // connect to channel on Twitch client
-            _twitchClient.JoinChannel(user.Login);
+            await _twitchClient.JoinChannelAsync(user.Login);
             // also create a Markov chain
             await _chainService.AddOrUpdateChainForChannel(notification.ChannelId);
         }

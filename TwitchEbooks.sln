@@ -7,6 +7,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TwitchEbooks.Database", "Tw
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TwitchEbooks", "TwitchEbooks\TwitchEbooks.csproj", "{00548FA2-756C-4B1E-96F6-F6A8D54AB92E}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TwitchEbooks.Twitch", "TwitchEbooks.Twitch\TwitchEbooks.Twitch.csproj", "{DF0C9C14-8057-44E4-8EEA-61E741598F2B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TwitchEbooks.Twitch.Tests", "TwitchEbooks.Twitch.Tests\TwitchEbooks.Twitch.Tests.csproj", "{CF449EC0-4F2C-4DEE-A53F-A3A8CB5B730E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +25,14 @@ Global
 		{00548FA2-756C-4B1E-96F6-F6A8D54AB92E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{00548FA2-756C-4B1E-96F6-F6A8D54AB92E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{00548FA2-756C-4B1E-96F6-F6A8D54AB92E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DF0C9C14-8057-44E4-8EEA-61E741598F2B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DF0C9C14-8057-44E4-8EEA-61E741598F2B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DF0C9C14-8057-44E4-8EEA-61E741598F2B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DF0C9C14-8057-44E4-8EEA-61E741598F2B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CF449EC0-4F2C-4DEE-A53F-A3A8CB5B730E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CF449EC0-4F2C-4DEE-A53F-A3A8CB5B730E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CF449EC0-4F2C-4DEE-A53F-A3A8CB5B730E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CF449EC0-4F2C-4DEE-A53F-A3A8CB5B730E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

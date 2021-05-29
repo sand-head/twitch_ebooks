@@ -31,18 +31,16 @@ namespace TwitchEbooks.Handlers
         public async Task Handle(ReceiveMessageNotification notification, CancellationToken cancellationToken)
         {
             var message = notification.Message;
-            var channelId = uint.Parse(message.RoomId);
-            var userId = uint.Parse(message.UserId);
 
             var context = _contextFactory.CreateDbContext();
             // obviously, don't store messages by ignored users
-            if (context.IgnoredUsers.Any(i => i.Id == userId && i.ChannelId == channelId)) return;
+            if (context.IgnoredUsers.Any(i => i.Id == message.UserId && i.ChannelId == message.RoomId)) return;
 
             var twitchMsg = new TwitchMessage
             {
-                Id = Guid.Parse(message.Id),
-                ChannelId = channelId,
-                UserId = userId,
+                Id = message.Id,
+                ChannelId = message.RoomId,
+                UserId = message.UserId,
                 Message = message.Message,
                 ReceivedOn = DateTime.UtcNow
             };

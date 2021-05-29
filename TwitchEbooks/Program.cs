@@ -7,16 +7,14 @@ using Serilog;
 using Serilog.Events;
 using System;
 using System.Linq;
-using System.Net.Http;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
 using TwitchEbooks.Database.Models;
 using TwitchEbooks.Infrastructure;
 using TwitchEbooks.Models;
 using TwitchEbooks.Services;
-using TwitchLib.Api;
-using TwitchLib.Client;
-using TwitchLib.Client.Models;
+using TwitchEbooks.Twitch.Api;
+using TwitchEbooks.Twitch.Chat;
 
 namespace TwitchEbooks
 {
@@ -63,70 +61,13 @@ namespace TwitchEbooks
                     services.AddSingleton(twitchSettings);
 
                     // Misc. dependencies
+                    services.AddHttpClient<TwitchApi>();
                     services
+                        .AddSingleton<TwitchApiFactory>()
+                        .AddSingleton<TwitchClient>()
                         .AddMediatR(typeof(Program))
-                        .AddHttpClient()
                         .AddSingleton<MessageGenerationQueue>()
                         .AddSingleton<IMarkovChainService, MarkovChainService>();
-
-                    // TwitchLib stuff
-                    services
-                        .AddSingleton<TwitchAPI>(services =>
-                        {
-                            var context = services.CreateScope().ServiceProvider.GetRequiredService<TwitchEbooksContext>();
-                            var tokens = context.AccessTokens.OrderByDescending(a => a.CreatedOn).First();
-
-                            var api = new TwitchAPI();
-                            api.Settings.AccessToken = tokens.AccessToken;
-                            api.Settings.ClientId = twitchSettings.ClientId;
-
-                            return api;
-                        })
-                        .AddSingleton<ConnectionCredentials>(services =>
-                        {
-                            var httpClient = services.GetRequiredService<IHttpClientFactory>().CreateClient();
-                            var context = services.CreateScope().ServiceProvider.GetRequiredService<TwitchEbooksContext>();
-                            var tokens = context.AccessTokens.OrderByDescending(a => a.CreatedOn).First();
-
-                            // manually validate tokens
-                            // I cannot believe TwitchLib is only *just now* adding this endpoint
-                            // for a library with so much community use how is it not actively supported
-                            var request = new HttpRequestMessage(HttpMethod.Get, "https://id.twitch.tv/oauth2/validate");
-                            request.Headers.Add("Authorization", $"OAuth {tokens.AccessToken}");
-                            var response = httpClient.SendAsync(request).GetAwaiter().GetResult();
-
-                            if (!response.IsSuccessStatusCode)
-                            {
-                                Log.Information("Refreshing tokens...");
-                                var api = services.GetRequiredService<TwitchAPI>();
-                                var settings = services.GetRequiredService<TwitchSettings>();
-                                var refreshResponse = api.V5.Auth.RefreshAuthTokenAsync(tokens.RefreshToken, settings.ClientSecret).GetAwaiter().GetResult();
-                                var createdOn = DateTime.UtcNow;
-
-                                tokens = new UserAccessToken
-                                {
-                                    UserId = tokens.UserId,
-                                    AccessToken = refreshResponse.AccessToken,
-                                    RefreshToken = refreshResponse.RefreshToken,
-                                    ExpiresIn = refreshResponse.ExpiresIn,
-                                    CreatedOn = createdOn
-                                };
-
-                                api.Settings.AccessToken = tokens.AccessToken;
-                                context.AccessTokens.Add(tokens);
-                                context.SaveChanges();
-                                Log.Information("Tokens refreshed!");
-                            }
-
-                            return new ConnectionCredentials(twitchSettings.BotUsername, tokens.AccessToken);
-                        })
-                        .AddSingleton<TwitchClient>(services =>
-                        {
-                            var client = new TwitchClient();
-                            client.Initialize(services.GetRequiredService<ConnectionCredentials>());
-
-                            return client;
-                        });
 
                     // Hosted services
                     services

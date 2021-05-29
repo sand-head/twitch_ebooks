@@ -8,9 +8,10 @@ using System.Threading.Tasks;
 using TwitchEbooks.Database;
 using TwitchEbooks.Database.Models;
 using TwitchEbooks.Infrastructure;
+using TwitchEbooks.Models;
 using TwitchEbooks.Models.Notifications;
-using TwitchLib.Api;
-using TwitchLib.Client;
+using TwitchEbooks.Twitch.Api;
+using TwitchEbooks.Twitch.Chat;
 
 namespace TwitchEbooks.Handlers
 {
@@ -19,21 +20,24 @@ namespace TwitchEbooks.Handlers
         private readonly ILogger<LeaveNotificationHandler> _logger;
         private readonly IDbContextFactory<TwitchEbooksContext> _contextFactory;
         private readonly IMarkovChainService _chainService;
-        private readonly TwitchAPI _twitchApi;
+        private readonly TwitchApi _twitchApi;
         private readonly TwitchClient _twitchClient;
+        private readonly TwitchSettings _twitchSettings;
 
         public LeaveNotificationHandler(
             ILogger<LeaveNotificationHandler> logger,
             IDbContextFactory<TwitchEbooksContext> contextFactory,
             IMarkovChainService chainService,
-            TwitchAPI twitchApi,
-            TwitchClient twitchClient)
+            TwitchApi twitchApi,
+            TwitchClient twitchClient,
+            TwitchSettings twitchSettings)
         {
             _logger = logger;
             _contextFactory = contextFactory;
             _chainService = chainService;
             _twitchApi = twitchApi;
             _twitchClient = twitchClient;
+            _twitchSettings = twitchSettings;
         }
 
         public async Task Handle(LeaveNotification notification, CancellationToken cancellationToken)
@@ -45,11 +49,12 @@ namespace TwitchEbooks.Handlers
 
             // disconnect from channel on Twitch
             // make sure a user exists on Twitch first
-            var usersResponse = await _twitchApi.Helix.Users.GetUsersAsync(ids: new List<string> { notification.ChannelId.ToString() });
+            var tokens = context.AccessTokens.OrderByDescending(t => t.CreatedOn).First();
+            var usersResponse = await _twitchApi.GetUsersAsync(tokens.AccessToken, _twitchSettings.ClientId, ids: new List<string> { notification.ChannelId.ToString() });
             if (usersResponse.Users.Length == 1)
             {
                 var user = usersResponse.Users[0];
-                _twitchClient.LeaveChannel(user.Login);
+                await _twitchClient.LeaveChannelAsync(user.Login);
             }
 
             // remove channel from database
