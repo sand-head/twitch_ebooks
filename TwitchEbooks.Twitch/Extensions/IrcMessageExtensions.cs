@@ -15,12 +15,14 @@ namespace TwitchEbooks.Twitch.Extensions
                     Channel: ircMessage.Parameters[0][1..],
                     Username: ircMessage.Source[..ircMessage.Source.IndexOf('!')]),
                 "PRIVMSG" => ToChatMessage(ircMessage),
-                "NOTICE" => ircMessage.Tags["msg-id"] switch
+                "USERNOTICE" => ircMessage.Tags["msg-id"] switch
                 {
                     "subgift" or "anonsubgift" => new TwitchMessage.GiftSub(
                         Channel: ircMessage.Parameters[0][1..],
                         CumulativeMonths: int.Parse(ircMessage.Tags["msg-param-months"]),
-                        GiftMonths: int.Parse(ircMessage.Tags["msg-param-gift-months"]),
+                        GiftMonths: ircMessage.Tags.ContainsKey("msg-param-gift-months")
+                            ? int.Parse(ircMessage.Tags["msg-param-gift-months"])
+                            : 1,
                         Message: ircMessage.Tags["system-msg"],
                         RecipientDisplayName: ircMessage.Tags["msg-param-recipient-display-name"],
                         RecipientId: uint.Parse(ircMessage.Tags["msg-param-recipient-id"]),

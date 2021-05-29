@@ -106,8 +106,6 @@ namespace TwitchEbooks.Twitch.Chat
 
         public async Task<TwitchMessage> ReadMessageAsync(CancellationToken token = default)
         {
-            // this needs to read back a message at a time from the open websocket
-            // since I guess we can get multiple messages back
             var message = "";
             using var comboToken = CancellationTokenSource.CreateLinkedTokenSource(_tokenSource.Token, token);
 
