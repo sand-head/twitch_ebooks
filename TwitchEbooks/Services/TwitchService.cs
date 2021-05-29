@@ -94,24 +94,31 @@ namespace TwitchEbooks.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 var message = await _client.ReadMessageAsync(stoppingToken);
-                switch (message)
+                try
                 {
-                    case TwitchMessage.Welcome:
-                        _logger.LogInformation("Connected!");
-                        await TwitchClient_OnConnected();
-                        break;
-                    case TwitchMessage.Join join:
-                        _logger.LogInformation("{User} has joined channel {Channel}.", join.Username, join.Channel);
-                        break;
-                    case TwitchMessage.Chat chat:
-                        await TwitchClient_OnMessageReceived(chat);
-                        break;
-                    case TwitchMessage.GiftSub giftSub:
-                        await TwitchClient_OnGiftedSubscription(giftSub);
-                        break;
-                    case TwitchMessage.Leave leave:
-                        _logger.LogInformation("{User} has left channel {Channel}.", leave.Username, leave.Channel);
-                        break;
+                    switch (message)
+                    {
+                        case TwitchMessage.Welcome:
+                            _logger.LogInformation("Connected!");
+                            await TwitchClient_OnConnected();
+                            break;
+                        case TwitchMessage.Join join:
+                            _logger.LogInformation("{User} has joined channel {Channel}.", join.Username, join.Channel);
+                            break;
+                        case TwitchMessage.Chat chat:
+                            await TwitchClient_OnMessageReceived(chat);
+                            break;
+                        case TwitchMessage.GiftSub giftSub:
+                            await TwitchClient_OnGiftedSubscription(giftSub);
+                            break;
+                        case TwitchMessage.Leave leave:
+                            _logger.LogInformation("{User} has left channel {Channel}.", leave.Username, leave.Channel);
+                            break;
+                    }
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError("Exception caught in message read loop after receiving {MessageType}: {Exception}", message.GetType(), e);
                 }
             }
 

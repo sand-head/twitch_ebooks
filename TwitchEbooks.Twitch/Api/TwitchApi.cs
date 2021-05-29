@@ -39,14 +39,16 @@ namespace TwitchEbooks.Twitch.Api
         public async Task<UsersResponse> GetUsersAsync(string accessToken, string clientId, List<string> ids = default, List<string> logins = default)
         {
             var queryStringList = new List<string>();
-            foreach (var id in ids)
-            {
-                queryStringList.Add($"id={id}");
-            }
-            foreach (var login in logins)
-            {
-                queryStringList.Add($"login={login}");
-            }
+            if (ids is not null)
+                foreach (var id in ids)
+                {
+                    queryStringList.Add($"id={id}");
+                }
+            if (logins is not null)
+                foreach (var login in logins)
+                {
+                    queryStringList.Add($"login={login}");
+                }
 
             var queryString = string.Join('&', queryStringList);
             var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.twitch.tv/helix/users?{queryString}");
