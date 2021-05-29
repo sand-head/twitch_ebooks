@@ -38,6 +38,7 @@ namespace TwitchEbooks.Twitch.Chat
             _serverUri = new Uri(serverUri);
             _username = username ?? throw new ArgumentNullException(nameof(username));
             _accessToken = accessToken ?? throw new ArgumentNullException(nameof(accessToken));
+            _joinedChannels = new List<string>();
 
             using var comboToken = CancellationTokenSource.CreateLinkedTokenSource(_tokenSource.Token, token);
             await _client.ConnectAsync(_serverUri, comboToken.Token);
