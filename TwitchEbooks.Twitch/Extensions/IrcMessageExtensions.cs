@@ -52,7 +52,7 @@ namespace TwitchEbooks.Twitch.Extensions
                 IsBroadcaster: channelName == username,
                 IsHighlighted: ircMessage.Tags.ContainsKey("msg-id") && ircMessage.Tags["msg-id"] == "highlighted-message",
                 IsMe: isMeCommand,
-                IsModerator: bool.Parse(ircMessage.Tags["mod"]),
+                IsModerator: ircMessage.Tags["mod"] == "1",
                 Message: isMeCommand ? ircMessage.Parameters[1].Trim('\u0001')[7..] : ircMessage.Parameters[1],
                 RoomId: uint.Parse(ircMessage.Tags["room-id"]),
                 UserId: uint.Parse(ircMessage.Tags["user-id"]),
