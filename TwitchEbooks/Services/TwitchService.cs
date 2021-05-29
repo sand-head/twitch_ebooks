@@ -94,13 +94,20 @@ namespace TwitchEbooks.Services
                 switch (message)
                 {
                     case TwitchMessage.Welcome:
+                        _logger.LogInformation("Connected!");
                         await TwitchClient_OnConnected();
+                        break;
+                    case TwitchMessage.Join join:
+                        _logger.LogInformation("{User} has joined channel {Channel}.", join.Username, join.Channel);
+                        break;
+                    case TwitchMessage.Chat chat:
+                        await TwitchClient_OnMessageReceived(chat);
                         break;
                     case TwitchMessage.GiftSub giftSub:
                         await TwitchClient_OnGiftedSubscription(giftSub);
                         break;
-                    case TwitchMessage.Chat chat:
-                        await TwitchClient_OnMessageReceived(chat);
+                    case TwitchMessage.Leave leave:
+                        _logger.LogInformation("{User} has left channel {Channel}.", leave.Username, leave.Channel);
                         break;
                 }
             }
@@ -112,14 +119,13 @@ namespace TwitchEbooks.Services
 
         private async Task TwitchClient_OnConnected()
         {
-            _logger.LogInformation("Connected!");
             var context = _contextFactory.CreateDbContext();
 
             var api = _apiFactory.CreateApiClient();
             var usersResponse = await api.GetUsersAsync(_tokens.AccessToken, _settings.ClientId, ids: context.Channels.Select(c => c.Id.ToString()).ToList());
             foreach (var user in usersResponse.Users)
             {
-                _logger.LogInformation("Joining channel {Id}...", user.Id);
+                _logger.LogInformation("Joining channel {Name}...", user.Login);
                 await _client.JoinChannelAsync(user.Login);
             }
         }
