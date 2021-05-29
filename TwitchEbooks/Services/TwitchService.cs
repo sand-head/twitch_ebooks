@@ -10,28 +10,26 @@ using System.Net.Http.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
-using TwitchEbooks.Database.Models;
 using TwitchEbooks.Models;
 using TwitchEbooks.Models.Notifications;
-using TwitchLib.Api;
-using TwitchLib.Client;
-using TwitchLib.Client.Events;
-using TwitchLib.Client.Models;
-using TwitchLib.Communication.Events;
+using TwitchEbooks.Twitch.Api;
+using TwitchEbooks.Twitch.Chat;
+using TwitchEbooks.Twitch.Chat.EventArgs;
+using TwitchEbooks.Twitch.Chat.Messages;
 
 namespace TwitchEbooks.Services
 {
-    public class TwitchService : IHostedService
+    public class TwitchService : BackgroundService
     {
         private readonly ILogger<TwitchService> _logger;
         private readonly IDbContextFactory<TwitchEbooksContext> _contextFactory;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IMediator _mediator;
-        private readonly TwitchAPI _api;
+        private readonly TwitchApiFactory _apiFactory;
         private readonly TwitchClient _client;
         private readonly TwitchSettings _settings;
 
-        private UserAccessToken _tokens = null;
+        private Database.Models.UserAccessToken _tokens = null;
         private bool _isStopping = false;
 
         public TwitchService(
@@ -39,7 +37,7 @@ namespace TwitchEbooks.Services
             IDbContextFactory<TwitchEbooksContext> contextFactory,
             IHttpClientFactory httpClientFactory,
             IMediator mediator,
-            TwitchAPI api,
+            TwitchApiFactory apiFactory,
             TwitchClient client,
             TwitchSettings settings)
         {
@@ -47,131 +45,142 @@ namespace TwitchEbooks.Services
             _contextFactory = contextFactory;
             _httpClientFactory = httpClientFactory;
             _mediator = mediator;
-            _api = api;
+            _apiFactory = apiFactory;
             _client = client;
             _settings = settings;
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             var context = _contextFactory.CreateDbContext();
             // get and keep the latest auth tokens
             _tokens = context.AccessTokens.OrderByDescending(a => a.CreatedOn).First();
 
-            // register event handlers
-            _client.OnLog += TwitchClient_OnLog;
-            _client.OnConnected += TwitchClient_OnConnected;
-            _client.OnConnectionError += TwitchClient_OnConnectionError;
-            _client.OnError += TwitchClient_OnError;
-            _client.OnGiftedSubscription += TwitchClient_OnGiftedSubscription;
-            _client.OnMessageReceived += TwitchClient_OnMessageReceived;
+            // validate our tokens and refresh if necessary
+            var api = _apiFactory.CreateApiClient();
+            var response = await api.VerifyAccessTokenAsync(_tokens.AccessToken);
+            if (response is null)
+            {
+                _logger.LogInformation("Refreshing tokens...");
+                var refreshResponse = await api.RefreshTokensAsync(_tokens.RefreshToken, _settings.ClientId, _settings.ClientSecret);
+                var createdOn = DateTime.UtcNow;
+
+                _tokens = new Database.Models.UserAccessToken
+                {
+                    UserId = _tokens.UserId,
+                    AccessToken = refreshResponse.AccessToken,
+                    RefreshToken = refreshResponse.RefreshToken,
+                    ExpiresIn = refreshResponse.ExpiresIn,
+                    CreatedOn = createdOn
+                };
+
+                // api.Settings.AccessToken = tokens.AccessToken;
+                context.AccessTokens.Add(_tokens);
+                context.SaveChanges();
+                _logger.LogInformation("Tokens refreshed!");
+            }
+
+            // hook up events
             _client.OnDisconnected += TwitchClient_OnDisconnected;
 
             // connect to Twitch
             _logger.LogInformation("Connecting to Twitch...");
-            if (!_client.Connect())
-            {
-                throw new Exception("Could not connect client to Twitch");
-            }
-            return Task.CompletedTask;
-        }
+            await _client.ConnectAsync(_settings.BotUsername, _tokens.AccessToken, token: stoppingToken);
 
-        public Task StopAsync(CancellationToken cancellationToken)
-        {
+            // continue to read messages until the application stops
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                var message = await _client.ReadMessageAsync(stoppingToken);
+                switch (message)
+                {
+                    case TwitchMessage.Welcome:
+                        await TwitchClient_OnConnected();
+                        break;
+                    case TwitchMessage.GiftSub giftSub:
+                        await TwitchClient_OnGiftedSubscription(giftSub);
+                        break;
+                    case TwitchMessage.Chat chat:
+                        await TwitchClient_OnMessageReceived(chat);
+                        break;
+                }
+            }
+
             _isStopping = true;
             _logger.LogInformation("Disconnecting from Twitch...");
             _client.Disconnect();
-            return Task.CompletedTask;
         }
 
-        private void TwitchClient_OnLog(object sender, OnLogArgs e)
-        {
-            _logger.LogDebug(e.Data);
-        }
-
-        private async void TwitchClient_OnConnected(object sender, OnConnectedArgs e)
+        private async Task TwitchClient_OnConnected()
         {
             _logger.LogInformation("Connected!");
             var context = _contextFactory.CreateDbContext();
 
-            var usersResponse = await _api.Helix.Users.GetUsersAsync(ids: context.Channels.Select(c => c.Id.ToString()).ToList());
+            var api = _apiFactory.CreateApiClient();
+            var usersResponse = await api.GetUsersAsync(_tokens.AccessToken, _settings.ClientId, ids: context.Channels.Select(c => c.Id.ToString()).ToList());
             foreach (var user in usersResponse.Users)
             {
                 _logger.LogInformation("Joining channel {Id}...", user.Id);
-                _client.JoinChannel(user.Login);
+                await _client.JoinChannelAsync(user.Login);
             }
         }
 
-        private void TwitchClient_OnConnectionError(object sender, OnConnectionErrorArgs e)
+        private async Task TwitchClient_OnGiftedSubscription(TwitchMessage.GiftSub giftSub)
         {
-            _logger.LogError("An error occurred while trying to connect {Username} to Twitch: {Message}", e.BotUsername, e.Error.Message);
-            // todo: do stuff to fix this
-        }
-
-        private void TwitchClient_OnError(object sender, OnErrorEventArgs e)
-        {
-            _logger.LogError("An error occurred within the Twitch client: {Exception}", e.Exception);
-        }
-
-        private async void TwitchClient_OnGiftedSubscription(object sender, OnGiftedSubscriptionArgs e)
-        {
-            var subMessage = e.GiftedSubscription;
-            var channelId = uint.Parse(subMessage.RoomId);
-
             // if the gift sub is to a channel we're in (and it's for the bot), send the celebratory messages
-            if (_tokens.UserId == uint.Parse(subMessage.MsgParamRecipientId) && _client.JoinedChannels.Select(jc => jc.Channel).Contains(e.Channel))
+            if (_tokens.UserId == giftSub.RecipientId && _client.JoinedChannels.Contains(giftSub.Channel))
             {
-                _logger.LogInformation("We got gifted a subscription to channel {Id}!", channelId);
-                await _mediator.Publish(new SendMessageNotification(channelId, $"🎉 Thanks for the gift sub @{subMessage.DisplayName}! 🎉"));
-                await _mediator.Publish(new GenerateMessageNotification(channelId));
+                _logger.LogInformation("We got gifted a subscription to channel {Id}!", giftSub.RoomId);
+                await _mediator.Publish(new SendMessageNotification(giftSub.RoomId, $"🎉 Thanks for the gift sub @{giftSub.SenderDisplayName}! 🎉"));
+                await _mediator.Publish(new GenerateMessageNotification(giftSub.RoomId));
             }
         }
 
-        private async void TwitchClient_OnMessageReceived(object sender, OnMessageReceivedArgs e)
+        private async Task TwitchClient_OnMessageReceived(TwitchMessage.Chat chat)
         {
-            var channelId = uint.Parse(e.ChatMessage.RoomId);
-            var userId = uint.Parse(e.ChatMessage.UserId);
+            var channelId = chat.RoomId;
+            var userId = chat.UserId;
 
             if (_tokens.UserId == channelId)
             {
                 // handle commands that are meant for the bot's chatroom
-                if (e.ChatMessage.Message.StartsWith("~join"))
+                if (chat.Message.StartsWith("~join"))
                     await _mediator.Publish(new JoinNotification(userId));
-                else if (e.ChatMessage.Message.StartsWith("~leave"))
+                else if (chat.Message.StartsWith("~leave"))
                     await _mediator.Publish(new LeaveNotification(userId));
             }
             else
             {
                 // handle commands that are meant for a user's chatroom
-                if (e.ChatMessage.Message.StartsWith("~generate"))
+                if (chat.Message.StartsWith("~generate"))
                     await _mediator.Publish(new GenerateMessageNotification(channelId));
-                else if (e.ChatMessage.Message.StartsWith("~leave") && e.ChatMessage.IsBroadcaster)
+                else if (chat.Message.StartsWith("~leave") && chat.IsBroadcaster)
                     await _mediator.Publish(new LeaveNotification(channelId));
-                else if (e.ChatMessage.Message.StartsWith("~purge") && (e.ChatMessage.IsBroadcaster || e.ChatMessage.IsModerator))
+                else if (chat.Message.StartsWith("~purge") && (chat.IsBroadcaster || chat.IsModerator))
                 {
-                    var splitMsg = e.ChatMessage.Message.Split(' ');
+                    var splitMsg = chat.Message.Split(' ');
                     if (splitMsg.Length <= 1 || string.IsNullOrWhiteSpace(splitMsg[1]))
                     {
-                        await _mediator.Publish(new SendMessageNotification(channelId, $"@{e.ChatMessage.Username} You have to include a word to purge!"));
+                        await _mediator.Publish(new SendMessageNotification(channelId, $"@{chat.Username} You have to include a word to purge!"));
                         return;
                     }
 
                     await _mediator.Publish(new PurgeWordNotification(channelId, splitMsg[1]));
                 }
-                else if (e.ChatMessage.Message.StartsWith("~ignore") && (e.ChatMessage.IsBroadcaster || e.ChatMessage.IsModerator))
+                else if (chat.Message.StartsWith("~ignore") && (chat.IsBroadcaster || chat.IsModerator))
                 {
-                    var splitMsg = e.ChatMessage.Message.Split(' ');
+                    var splitMsg = chat.Message.Split(' ');
                     if (splitMsg.Length <= 1 || string.IsNullOrWhiteSpace(splitMsg[1]))
                     {
-                        await _mediator.Publish(new SendMessageNotification(channelId, $"@{e.ChatMessage.Username} You have to include a username to ban!"));
+                        await _mediator.Publish(new SendMessageNotification(channelId, $"@{chat.Username} You have to include a username to ban!"));
                         return;
                     }
 
                     var userName = splitMsg[1].Trim();
-                    var usersResponse = await _api.Helix.Users.GetUsersAsync(logins: new List<string> { userName });
+                    var api = _apiFactory.CreateApiClient();
+                    var usersResponse = await api.GetUsersAsync(_tokens.AccessToken, _settings.ClientId, logins: new List<string> { userName });
                     if (usersResponse.Users.Length != 1)
                     {
-                        await _mediator.Publish(new SendMessageNotification(channelId, $"@{e.ChatMessage.Username} Couldn't find a user by the name of \"${userName}\", sorry!"));
+                        await _mediator.Publish(new SendMessageNotification(channelId, $"@{chat.Username} Couldn't find a user by the name of \"${userName}\", sorry!"));
                         return;
                     }
 
@@ -179,7 +188,7 @@ namespace TwitchEbooks.Services
                     await _mediator.Publish(new IgnoreUserNotification(channelId, ignoreUserId));
                 }
                 else
-                    await _mediator.Publish(new ReceiveMessageNotification(e.ChatMessage));
+                    await _mediator.Publish(new ReceiveMessageNotification(chat));
             }
         }
 
@@ -195,21 +204,13 @@ namespace TwitchEbooks.Services
             while (_client.IsConnected) { }
 
             _logger.LogInformation("Client disconnected unexpectedly, refreshing tokens...");
-            var refreshResponse = await _api.V5.Auth.RefreshAuthTokenAsync(_tokens.RefreshToken, _settings.ClientSecret);
+            var api = _apiFactory.CreateApiClient();
+            var refreshResponse = await api.RefreshTokensAsync(_tokens.RefreshToken, _settings.ClientId, _settings.ClientSecret);
             var createdOn = DateTime.UtcNow;
-
-            // manually validate tokens
-            // I cannot believe TwitchLib is only *just now* adding this endpoint
-            // for a library with so much community use how is it not actively supported
-            var httpClient = _httpClientFactory.CreateClient();
-            var request = new HttpRequestMessage(HttpMethod.Get, "https://id.twitch.tv/oauth2/validate");
-            request.Headers.Add("Authorization", $"OAuth {refreshResponse.AccessToken}");
-            var response = await httpClient.SendAsync(request);
-            var validateResponse = await response.Content.ReadFromJsonAsync<ValidateResponse>();
 
             // save new tokens to database
             using (var context = _contextFactory.CreateDbContext()) {
-                context.AccessTokens.Add(new UserAccessToken
+                context.AccessTokens.Add(new Database.Models.UserAccessToken
                 {
                     UserId = _tokens.UserId,
                     AccessToken = refreshResponse.AccessToken,
@@ -221,9 +222,9 @@ namespace TwitchEbooks.Services
             }
 
             // set API access token and new credentials and reconnect to chat
-            _api.Settings.AccessToken = refreshResponse.AccessToken;
-            _client.SetConnectionCredentials(new ConnectionCredentials(validateResponse.Login, refreshResponse.AccessToken));
-            _client.Connect();
+            // _apiFactory.Settings.AccessToken = refreshResponse.AccessToken;
+            // _client.SetConnectionCredentials(new ConnectionCredentials(validateResponse.Login, refreshResponse.AccessToken));
+            await _client.ReconnectAsync(accessToken: refreshResponse.AccessToken);
         }
     }
 }
