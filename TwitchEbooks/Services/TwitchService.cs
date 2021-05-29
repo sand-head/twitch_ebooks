@@ -137,9 +137,7 @@ namespace TwitchEbooks.Services
             var context = _contextFactory.CreateDbContext();
             var api = _apiFactory.CreateApiClient();
 
-            _logger.LogInformation("Getting connected user information...");
             var usersResponse = await api.GetUsersAsync(_tokens.AccessToken, _settings.ClientId, ids: context.Channels.Select(c => c.Id.ToString()).ToList());
-            _logger.LogInformation("Obtained information for {Count} user(s).", usersResponse.Users.Length);
             foreach (var user in usersResponse.Users)
             {
                 _logger.LogInformation("Joining channel {Name}...", user.Login);

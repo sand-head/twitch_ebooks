@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using TwitchEbooks.Twitch.Chat.EventArgs;
 using TwitchEbooks.Twitch.Chat.Messages;
@@ -17,15 +18,19 @@ namespace TwitchEbooks.Twitch.Chat
     {
         private readonly ClientWebSocket _client;
         private readonly CancellationTokenSource _tokenSource;
+        private readonly Channel<TwitchMessage> _incomingMessageQueue;
 
         private Uri _serverUri;
         private string _username, _accessToken;
         private List<string> _joinedChannels;
 
+        private Task _messageReadLoop;
+
         public TwitchClient()
         {
             _client = new ClientWebSocket();
             _tokenSource = new CancellationTokenSource();
+            _incomingMessageQueue = Channel.CreateUnbounded<TwitchMessage>();
         }
 
         public bool IsConnected => _client.State == WebSocketState.Open;
@@ -49,6 +54,7 @@ namespace TwitchEbooks.Twitch.Chat
             await SendRawMessageAsync("CAP REQ :twitch.tv/commands");
             await SendRawMessageAsync("CAP REQ :twitch.tv/membership");
             // OnConnected?.Invoke();
+            _messageReadLoop = MessageReadLoop();
         }
 
         public async Task ReconnectAsync(string accessToken = null, CancellationToken token = default)
@@ -105,50 +111,9 @@ namespace TwitchEbooks.Twitch.Chat
             return null;
         }
 
-        public async Task<TwitchMessage> ReadMessageAsync(CancellationToken token = default)
+        public async ValueTask<TwitchMessage> ReadMessageAsync(CancellationToken token = default)
         {
-            var message = "";
-            using var comboToken = CancellationTokenSource.CreateLinkedTokenSource(_tokenSource.Token, token);
-
-            while (IsConnected && !comboToken.Token.IsCancellationRequested)
-            {
-                var buffer = new byte[1024];
-                var result = await _client.ReceiveAsync(new ArraySegment<byte>(buffer), comboToken.Token);
-
-                if (result is null || result.MessageType == WebSocketMessageType.Binary) continue;
-
-                if (result.MessageType == WebSocketMessageType.Text)
-                {
-                    message += Encoding.UTF8.GetString(buffer).TrimEnd('\0');
-                }
-                else if (result.MessageType == WebSocketMessageType.Close)
-                {
-                    Disconnect();
-                }
-
-                if (result.EndOfMessage)
-                {
-                    var twitchMessage = IrcMessageParser.TryParse(message, out var ircMessage)
-                        ? ircMessage.ToTwitchMessage()
-                        : throw new Exception("Could not parse IrcMessage from received input.");
-
-                    OnLog?.Invoke(this, $"Received: {twitchMessage}");
-                    // do some fun things internally so consumers don't have to deal with them
-                    if (twitchMessage is TwitchMessage.Ping)
-                        await SendRawMessageAsync("PONG");
-                    else if (twitchMessage is TwitchMessage.Join joinMsg && _username == joinMsg.Username)
-                        _joinedChannels.Add(joinMsg.Channel);
-                    else if (twitchMessage is TwitchMessage.Leave leaveMsg && _username == leaveMsg.Username)
-                        _joinedChannels.Remove(leaveMsg.Channel);
-
-                    if (twitchMessage is not null) return twitchMessage;
-
-                    OnLog?.Invoke(this, $"Received weird message: {message}");
-                    message = "";
-                }
-            }
-
-            return null;
+            return await _incomingMessageQueue.Reader.ReadAsync(token);
         }
 
         public void Disconnect()
@@ -165,6 +130,62 @@ namespace TwitchEbooks.Twitch.Chat
             _tokenSource.Dispose();
             _client.Dispose();
             GC.Collect();
+        }
+
+        private async Task MessageReadLoop()
+        {
+            var messages = "";
+
+            try
+            {
+                while (IsConnected && !_tokenSource.Token.IsCancellationRequested)
+                {
+                    var buffer = new byte[1024];
+                    var result = await _client.ReceiveAsync(new ArraySegment<byte>(buffer), _tokenSource.Token);
+
+                    if (result is null || result.MessageType == WebSocketMessageType.Binary) continue;
+
+                    if (result.MessageType == WebSocketMessageType.Text)
+                    {
+                        messages += Encoding.UTF8.GetString(buffer).TrimEnd('\0');
+                    }
+                    else if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        Disconnect();
+                    }
+
+                    if (result.EndOfMessage)
+                    {
+                        foreach (var message in messages.Split('\n'))
+                        {
+                            var twitchMessage = IrcMessageParser.TryParse(message, out var ircMessage)
+                                ? ircMessage.ToTwitchMessage()
+                                : throw new Exception("Could not parse IrcMessage from received input.");
+
+                            OnLog?.Invoke(this, $"Received: {twitchMessage}");
+                            // do some fun things internally so consumers don't have to deal with them
+                            if (twitchMessage is TwitchMessage.Ping)
+                                await SendRawMessageAsync("PONG");
+                            else if (twitchMessage is TwitchMessage.Join joinMsg && _username == joinMsg.Username)
+                                _joinedChannels.Add(joinMsg.Channel);
+                            else if (twitchMessage is TwitchMessage.Leave leaveMsg && _username == leaveMsg.Username)
+                                _joinedChannels.Remove(leaveMsg.Channel);
+
+                            if (twitchMessage is not null)
+                                await _incomingMessageQueue.Writer.WriteAsync(twitchMessage, _tokenSource.Token);
+
+                            OnLog?.Invoke(this, $"Received weird message: {message}");
+                        }
+                        messages = "";
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                OnLog?.Invoke("Exception occured in client message reading loop: {Message}", e.Message);
+            }
+
+            OnDisconnected?.Invoke(this, new OnDisconnectedEventArgs());
         }
     }
 }
