@@ -1,4 +1,6 @@
-﻿using System;
+﻿using ComposableAsync;
+using RateLimiter;
+using System;
 using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Text;
@@ -19,12 +21,13 @@ namespace TwitchEbooks.Twitch.Chat
         private readonly ClientWebSocket _client;
         private readonly CancellationTokenSource _tokenSource;
         private readonly Channel<TwitchMessage> _incomingMessageQueue;
+        private readonly Channel<(string channelName, string message)> _outgoingMessageQueue;
 
         private Uri _serverUri;
         private string _username, _accessToken;
         private List<string> _joinedChannels;
 
-        private Task _messageReadLoop;
+        private Task _messageReadLoop, _messageSendLoop;
 
         public TwitchClient()
         {
@@ -33,6 +36,10 @@ namespace TwitchEbooks.Twitch.Chat
             _incomingMessageQueue = Channel.CreateUnbounded<TwitchMessage>(new UnboundedChannelOptions
             {
                 SingleWriter = true
+            });
+            _outgoingMessageQueue = Channel.CreateBounded<(string channelName, string message)>(new BoundedChannelOptions(30)
+            {
+                SingleReader = true
             });
         }
 
@@ -58,6 +65,7 @@ namespace TwitchEbooks.Twitch.Chat
             await SendRawMessageAsync("CAP REQ :twitch.tv/membership");
             // OnConnected?.Invoke();
             _messageReadLoop = MessageReadLoop();
+            _messageSendLoop = MessageSendLoop();
         }
 
         public async Task ReconnectAsync(string accessToken = null, CancellationToken token = default)
@@ -77,10 +85,9 @@ namespace TwitchEbooks.Twitch.Chat
                 await SendRawMessageAsync($"PART #{channelName}");
         }
 
-        public async Task SendChatMessageAsync(string channelName, string message)
+        public async Task SendChatMessageAsync(string channelName, string message, CancellationToken token = default)
         {
-            if (IsConnected)
-                await SendRawMessageAsync($"PRIVMSG #{channelName} :{message}");
+            await _outgoingMessageQueue.Writer.WriteAsync((channelName, message), token);
         }
 
         public async Task SendRawMessageAsync(string message)
@@ -141,7 +148,7 @@ namespace TwitchEbooks.Twitch.Chat
 
             try
             {
-                while (IsConnected && !_tokenSource.Token.IsCancellationRequested)
+                while (IsConnected && !_tokenSource.IsCancellationRequested)
                 {
                     var buffer = new byte[1024];
                     var result = await _client.ReceiveAsync(new ArraySegment<byte>(buffer), _tokenSource.Token);
@@ -192,6 +199,25 @@ namespace TwitchEbooks.Twitch.Chat
             }
 
             OnDisconnected?.Invoke(this, new OnDisconnectedEventArgs());
+        }
+
+        private async Task MessageSendLoop()
+        {
+            var rateLimit = TimeLimiter.GetFromMaxCountByInterval(20, TimeSpan.FromSeconds(30));
+
+            try
+            {
+                while (IsConnected && !_tokenSource.IsCancellationRequested)
+                {
+                    await rateLimit;
+                    var (channelName, message) = await _outgoingMessageQueue.Reader.ReadAsync(_tokenSource.Token);
+                    await SendRawMessageAsync($"PRIVMSG #{channelName} :{message}");
+                }
+            }
+            catch (Exception e)
+            {
+                OnLog?.Invoke("Exception occured in client message sending loop: {Message}", e.Message);
+            }
         }
     }
 }
