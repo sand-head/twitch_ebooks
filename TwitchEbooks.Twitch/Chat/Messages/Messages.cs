@@ -7,8 +7,40 @@ namespace TwitchEbooks.Twitch.Chat.Messages
 
     public abstract record TwitchMessage
     {
-        public record Welcome : TwitchMessage;
-        public record Ping : TwitchMessage;
+        /// <summary>
+        /// Represents command "001".
+        /// </summary>
+        public record Welcome() : TwitchMessage;
+        /// <summary>
+        /// Represents command "375".
+        /// </summary>
+        public record MotdStart() : TwitchMessage;
+        /// <summary>
+        /// Represents command "372".
+        /// </summary>
+        public record Motd(string Message) : TwitchMessage;
+        /// <summary>
+        /// Represents command "376".
+        /// </summary>
+        public record EndOfMotd() : TwitchMessage;
+        /// <summary>
+        /// Represents command "353".
+        /// </summary>
+        public record NameReply(List<string> Users) : TwitchMessage;
+        /// <summary>
+        /// Represents command "366".
+        /// </summary>
+        public record EndOfNames() : TwitchMessage;
+        /// <summary>
+        /// Represents command "421".
+        /// </summary>
+        public record UnknownCommand(string Message) : TwitchMessage;
+
+        /// <summary>
+        /// Represents the "CAP * ACK" response indicating a successful capacity request.
+        /// </summary>
+        public record CapAck(string Capability) : TwitchMessage; 
+        public record Ping(string Server) : TwitchMessage;
         public record Join(
             string Channel,
             string Username) : TwitchMessage;

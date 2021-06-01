@@ -10,7 +10,14 @@ namespace TwitchEbooks.Twitch.Extensions
             return ircMessage.Command switch
             {
                 "001" => new TwitchMessage.Welcome(),
-                "PING" => new TwitchMessage.Ping(),
+                "375" => new TwitchMessage.MotdStart(),
+                "372" => new TwitchMessage.Motd(Message: ircMessage.Parameters[0]),
+                "376" => new TwitchMessage.EndOfMotd(),
+                "353" => new TwitchMessage.NameReply(Users: ircMessage.Parameters),
+                "366" => new TwitchMessage.EndOfNames(),
+                "421" => new TwitchMessage.UnknownCommand(Message: ircMessage.Parameters[0]),
+                "CAP" when ircMessage.Parameters[1] == "ACK" => new TwitchMessage.CapAck(Capability: ircMessage.Parameters[2]),
+                "PING" => new TwitchMessage.Ping(Server: ircMessage.Parameters[0]),
                 "JOIN" => new TwitchMessage.Join(
                     Channel: ircMessage.Parameters[0][1..],
                     Username: ircMessage.Source[..ircMessage.Source.IndexOf('!')]),
