@@ -80,7 +80,7 @@ namespace TwitchEbooks.Twitch.Chat
             await ConnectAsync(_username, accessToken ?? _accessToken, _serverUri.ToString(), token);
         }
 
-        public async Task JoinChannelAsync(string channelName, CancellationToken token = default)
+        public async ValueTask JoinChannelAsync(string channelName, CancellationToken token = default)
         {
             await _joinQueue.Writer.WriteAsync(channelName, token);
         }
@@ -91,7 +91,7 @@ namespace TwitchEbooks.Twitch.Chat
                 await SendRawMessageAsync($"PART #{channelName}");
         }
 
-        public async Task SendChatMessageAsync(string channelName, string message, CancellationToken token = default)
+        public async ValueTask SendChatMessageAsync(string channelName, string message, CancellationToken token = default)
         {
             await _outgoingMessageQueue.Writer.WriteAsync((channelName, message), token);
         }
