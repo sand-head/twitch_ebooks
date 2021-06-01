@@ -64,7 +64,7 @@ namespace TwitchEbooks.Twitch.Chat
                     case (ParserState.Command, ' '):
                         command = rawMessage[start..i];
                         state = ParserState.Parameters;
-                        start = ++i;
+                        start = i + 1;
                         break;
                     case (ParserState.Parameters, ':'):
                         state = ParserState.Trailing;
