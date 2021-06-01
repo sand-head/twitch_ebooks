@@ -108,6 +108,9 @@ namespace TwitchEbooks.Services
                         case TwitchMessage.Chat chat:
                             await TwitchClient_OnMessageReceived(chat);
                             break;
+                        case TwitchMessage.ClearMsg clearMsg:
+                            // todo: delete message from database, rebuild chain
+                            break;
                         case TwitchMessage.GiftSub giftSub:
                             await TwitchClient_OnGiftedSubscription(giftSub);
                             break;

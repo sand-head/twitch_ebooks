@@ -36,11 +36,22 @@ namespace TwitchEbooks.Twitch.Chat.Messages
         /// </summary>
         public record UnknownCommand(string Message) : TwitchMessage;
 
+        public record Ping(string Server) : TwitchMessage;
         /// <summary>
         /// Represents the "CAP * ACK" response indicating a successful capacity request.
         /// </summary>
-        public record CapAck(string Capability) : TwitchMessage; 
-        public record Ping(string Server) : TwitchMessage;
+        public record CapAck(string Capability) : TwitchMessage;
+        public record ClearMsg(
+            string Login,
+            Guid TargetMessageId,
+            string Channel,
+            string Message) : TwitchMessage;
+        public record RoomState(
+            bool EmoteOnly,
+            bool FollowersOnly,
+            bool R9K,
+            int Slow,
+            bool SubsOnly) : TwitchMessage;
         public record Join(
             string Channel,
             string Username) : TwitchMessage;

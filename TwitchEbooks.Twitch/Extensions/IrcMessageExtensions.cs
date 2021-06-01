@@ -16,8 +16,19 @@ namespace TwitchEbooks.Twitch.Extensions
                 "353" => new TwitchMessage.NameReply(Users: ircMessage.Parameters),
                 "366" => new TwitchMessage.EndOfNames(),
                 "421" => new TwitchMessage.UnknownCommand(Message: ircMessage.Parameters[0]),
-                "CAP" when ircMessage.Parameters[1] == "ACK" => new TwitchMessage.CapAck(Capability: ircMessage.Parameters[2]),
                 "PING" => new TwitchMessage.Ping(Server: ircMessage.Parameters[0]),
+                "CAP" when ircMessage.Parameters[1] == "ACK" => new TwitchMessage.CapAck(Capability: ircMessage.Parameters[2]),
+                "CLEARMSG" => new TwitchMessage.ClearMsg(
+                    Login: ircMessage.Tags["login"],
+                    TargetMessageId: Guid.Parse(ircMessage.Tags["target-msg-id"]),
+                    Channel: ircMessage.Parameters[0][1..],
+                    Message: ircMessage.Parameters[1]),
+                "ROOMSTATE" => new TwitchMessage.RoomState(
+                    EmoteOnly: ircMessage.Tags["emote-only"] == "1",
+                    FollowersOnly: ircMessage.Tags["followers-only"] != "-1",
+                    R9K: ircMessage.Tags["r9k"] == "1",
+                    Slow: int.Parse(ircMessage.Tags["slow"]),
+                    SubsOnly: ircMessage.Tags["subs-only"] == "1"),
                 "JOIN" => new TwitchMessage.Join(
                     Channel: ircMessage.Parameters[0][1..],
                     Username: ircMessage.Source[..ircMessage.Source.IndexOf('!')]),
