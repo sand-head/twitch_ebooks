@@ -4,16 +4,48 @@ using System.Threading.Tasks;
 using TwitchEbooks.Twitch.Chat;
 using TwitchEbooks.Twitch.Chat.Messages;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace TwitchEbooks.Twitch.Tests.Chat
 {
     public class TwitchClientTests
     {
+        private readonly ITestOutputHelper _output;
+
+        public TwitchClientTests(ITestOutputHelper output)
+        {
+            _output = output;
+        }
+
+        [Fact]
+        public async Task ConnectAsyncShouldSuccessfullyConnectToTwitch()
+        {
+            // Arrange
+            var client = new TwitchClient();
+            client.OnLog += (_, e) => _output.WriteLine(e);
+            TwitchMessage.Welcome welcome = null;
+            async Task ReadLoop()
+            {
+                while (client.IsConnected && welcome is null)
+                {
+                    welcome = await client.ReadMessageAsync<TwitchMessage.Welcome>();
+                }
+            }
+
+            // Act
+            await client.ConnectAsync("justinfan0227", "");
+            await ReadLoop();
+
+            // Assert
+            Assert.NotNull(welcome);
+        }
+
         [Fact]
         public async Task JoinChannelShouldSuccessfullyJoinAChannel()
         {
             // Arrange
             var client = new TwitchClient();
+            client.OnLog += (_, e) => _output.WriteLine(e);
             TwitchMessage.Join join = null;
             async Task ReadLoop()
             {
@@ -41,6 +73,7 @@ namespace TwitchEbooks.Twitch.Tests.Chat
         {
             // Arrange
             var client = new TwitchClient();
+            client.OnLog += (_, e) => _output.WriteLine(e);
             TwitchMessage.GiftSub giftSub = null;
             async Task ReadLoop()
             {
@@ -72,6 +105,7 @@ namespace TwitchEbooks.Twitch.Tests.Chat
         {
             // Arrange
             var client = new TwitchClient();
+            client.OnLog += (_, e) => _output.WriteLine(e);
             TwitchMessage.GiftSub giftSub = null;
             async Task ReadLoop()
             {

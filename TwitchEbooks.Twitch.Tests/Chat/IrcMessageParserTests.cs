@@ -2,11 +2,19 @@ using System;
 using System.Text.Json;
 using TwitchEbooks.Twitch.Chat;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace TwitchEbooks.Twitch.Tests.Chat
 {
     public class IrcMessageParserTests
     {
+        private readonly ITestOutputHelper _output;
+        
+        public IrcMessageParserTests(ITestOutputHelper output)
+        {
+            _output = output;
+        }
+
         [Fact]
         public void TryParseShouldFillOutHighlightedMessageAndReturnTrue()
         {
@@ -15,7 +23,7 @@ namespace TwitchEbooks.Twitch.Tests.Chat
 
             // Act
             var success = IrcMessageParser.TryParse(message, out var ircMessage);
-            Console.WriteLine(JsonSerializer.Serialize(ircMessage));
+            _output.WriteLine(JsonSerializer.Serialize(ircMessage));
 
             // Assert
             Assert.True(success);
@@ -38,7 +46,7 @@ namespace TwitchEbooks.Twitch.Tests.Chat
 
             // Act
             var success = IrcMessageParser.TryParse(message, out var ircMessage);
-            Console.WriteLine(JsonSerializer.Serialize(ircMessage));
+            _output.WriteLine(JsonSerializer.Serialize(ircMessage));
 
             // Assert
             Assert.True(success);
@@ -57,7 +65,7 @@ namespace TwitchEbooks.Twitch.Tests.Chat
 
             // Act
             var success = IrcMessageParser.TryParse(message, out var ircMessage);
-            Console.WriteLine(JsonSerializer.Serialize(ircMessage));
+            _output.WriteLine(JsonSerializer.Serialize(ircMessage));
 
             // Assert
             Assert.True(success);
