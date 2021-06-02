@@ -11,7 +11,7 @@ namespace TwitchEbooks.Twitch.Extensions
             {
                 "001" => new TwitchMessage.Welcome(),
                 "375" => new TwitchMessage.MotdStart(),
-                "372" => new TwitchMessage.Motd(Message: ircMessage.Parameters[0]),
+                "372" => new TwitchMessage.Motd(Message: ircMessage.Parameters[1]),
                 "376" => new TwitchMessage.EndOfMotd(),
                 "353" => new TwitchMessage.NameReply(Users: ircMessage.Parameters),
                 "366" => new TwitchMessage.EndOfNames(),
