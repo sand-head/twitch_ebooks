@@ -152,56 +152,61 @@ namespace TwitchEbooks.Twitch.Chat
         {
             var messages = "";
 
-            try
+            while (IsConnected && !_tokenSource.IsCancellationRequested)
             {
-                while (IsConnected && !_tokenSource.IsCancellationRequested)
+                var buffer = new byte[1024];
+                var result = await _client.ReceiveAsync(new ArraySegment<byte>(buffer), _tokenSource.Token);
+
+                if (result is null || result.MessageType == WebSocketMessageType.Binary) continue;
+
+                if (result.MessageType == WebSocketMessageType.Text)
                 {
-                    var buffer = new byte[1024];
-                    var result = await _client.ReceiveAsync(new ArraySegment<byte>(buffer), _tokenSource.Token);
+                    messages += Encoding.UTF8.GetString(buffer).TrimEnd('\0');
+                }
+                else if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    Disconnect();
+                }
 
-                    if (result is null || result.MessageType == WebSocketMessageType.Binary) continue;
-
-                    if (result.MessageType == WebSocketMessageType.Text)
+                if (result.EndOfMessage)
+                {
+                    foreach (var message in messages.Trim().Replace("\r", string.Empty).Split('\n'))
                     {
-                        messages += Encoding.UTF8.GetString(buffer).TrimEnd('\0');
-                    }
-                    else if (result.MessageType == WebSocketMessageType.Close)
-                    {
-                        Disconnect();
-                    }
-
-                    if (result.EndOfMessage)
-                    {
-                        foreach (var message in messages.Trim().Replace("\r", string.Empty).Split('\n'))
+                        TwitchMessage twitchMessage;
+                        try
                         {
-                            var twitchMessage = IrcMessageParser.TryParse(message, out var ircMessage)
+                            twitchMessage = IrcMessageParser.TryParse(message, out var ircMessage)
                                 ? ircMessage.ToTwitchMessage()
                                 : null;
-
-                            if (twitchMessage is null)
-                            {
-                                OnLog?.Invoke(this, $"Received weird message: {message}");
-                                continue;
-                            }
-
-                            OnLog?.Invoke(this, $"Received: {twitchMessage}");
-                            // do some fun things internally so consumers don't have to deal with them
-                            if (twitchMessage is TwitchMessage.Ping ping)
-                                await SendRawMessageAsync($"PONG :{ping.Server}");
-                            else if (twitchMessage is TwitchMessage.Join joinMsg && _username == joinMsg.Username)
-                                _joinedChannels.Add(joinMsg.Channel);
-                            else if (twitchMessage is TwitchMessage.Part partMsg && _username == partMsg.Username)
-                                _joinedChannels.Remove(partMsg.Channel);
-
-                            await _incomingMessageQueue.Writer.WriteAsync(twitchMessage, _tokenSource.Token);
                         }
-                        messages = "";
+                        catch (FormatException e)
+                        {
+                            // either the client is hooked up to fdgt (which has inconsistencies with Twitch's IRC interface)
+                            // or something has unexpectedly changed in Twitch's responses due to an update
+                            // either way, it's probably best to just log & continue here
+                            OnLog?.Invoke(this, $"Could not parse property value out of string: {e.Message}\n{e.StackTrace}");
+                            continue;
+                        }
+
+                        if (twitchMessage is null)
+                        {
+                            OnLog?.Invoke(this, $"Received weird message: {message}");
+                            continue;
+                        }
+
+                        OnLog?.Invoke(this, $"Received: {twitchMessage}");
+                        // do some fun things internally so consumers don't have to deal with them
+                        if (twitchMessage is TwitchMessage.Ping ping)
+                            await SendRawMessageAsync($"PONG :{ping.Server}");
+                        else if (twitchMessage is TwitchMessage.Join joinMsg && _username == joinMsg.Username)
+                            _joinedChannels.Add(joinMsg.Channel);
+                        else if (twitchMessage is TwitchMessage.Part partMsg && _username == partMsg.Username)
+                            _joinedChannels.Remove(partMsg.Channel);
+
+                        await _incomingMessageQueue.Writer.WriteAsync(twitchMessage, _tokenSource.Token);
                     }
+                    messages = "";
                 }
-            }
-            catch (Exception e)
-            {
-                OnLog?.Invoke("Exception occured in client message reading loop: {Message}", e.Message);
             }
 
             OnDisconnected?.Invoke(this, new OnDisconnectedEventArgs());

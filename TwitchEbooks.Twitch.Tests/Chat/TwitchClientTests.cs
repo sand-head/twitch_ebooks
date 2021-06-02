@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Twitch.Chat;
 using TwitchEbooks.Twitch.Chat.Messages;
@@ -24,11 +25,14 @@ namespace TwitchEbooks.Twitch.Tests.Chat
             var client = new TwitchClient();
             client.OnLog += (_, e) => _output.WriteLine(e);
             TwitchMessage.Welcome welcome = null;
+
+            var cts = new CancellationTokenSource();
+            cts.CancelAfter(TimeSpan.FromMinutes(1));
             async Task ReadLoop()
             {
                 while (client.IsConnected && welcome is null)
                 {
-                    welcome = await client.ReadMessageAsync<TwitchMessage.Welcome>();
+                    welcome = await client.ReadMessageAsync<TwitchMessage.Welcome>(token: cts.Token);
                 }
             }
 
@@ -47,11 +51,14 @@ namespace TwitchEbooks.Twitch.Tests.Chat
             var client = new TwitchClient();
             client.OnLog += (_, e) => _output.WriteLine(e);
             TwitchMessage.Join join = null;
+
+            var cts = new CancellationTokenSource();
+            cts.CancelAfter(TimeSpan.FromMinutes(1));
             async Task ReadLoop()
             {
                 while (client.IsConnected && join is null)
                 {
-                    join = await client.ReadMessageAsync<TwitchMessage.Join>();
+                    join = await client.ReadMessageAsync<TwitchMessage.Join>(token: cts.Token);
                 }
             }
 
@@ -75,11 +82,14 @@ namespace TwitchEbooks.Twitch.Tests.Chat
             var client = new TwitchClient();
             client.OnLog += (_, e) => _output.WriteLine(e);
             TwitchMessage.GiftSub giftSub = null;
+
+            var cts = new CancellationTokenSource();
+            cts.CancelAfter(TimeSpan.FromMinutes(1));
             async Task ReadLoop()
             {
                 while (client.IsConnected && giftSub is null)
                 {
-                    giftSub = await client.ReadMessageAsync<TwitchMessage.GiftSub>();
+                    giftSub = await client.ReadMessageAsync<TwitchMessage.GiftSub>(token: cts.Token);
                 }
             }
 
