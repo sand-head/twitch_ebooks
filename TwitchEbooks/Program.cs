@@ -59,6 +59,7 @@ namespace TwitchEbooks
                     services.AddSingleton(twitchSettings);
 
                     // Misc. dependencies
+                    services.AddMemoryCache();
                     services.AddHttpClient<TwitchApi>();
                     services
                         .AddSingleton<TwitchApiFactory>()

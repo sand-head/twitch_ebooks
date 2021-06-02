@@ -3,11 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
+using TwitchEbooks.Infrastructure;
 using TwitchEbooks.Models;
 using TwitchEbooks.Models.MediatR.Notifications;
 using TwitchEbooks.Models.MediatR.Requests;
@@ -23,6 +23,7 @@ namespace TwitchEbooks.Services
         private readonly ILogger<TwitchService> _logger;
         private readonly IDbContextFactory<TwitchEbooksContext> _contextFactory;
         private readonly IMediator _mediator;
+        private readonly ITwitchUserService _userService;
         private readonly TwitchApiFactory _apiFactory;
         private readonly TwitchClient _client;
         private readonly TwitchSettings _settings;
@@ -34,6 +35,7 @@ namespace TwitchEbooks.Services
             ILogger<TwitchService> logger,
             IDbContextFactory<TwitchEbooksContext> contextFactory,
             IMediator mediator,
+            ITwitchUserService userService,
             TwitchApiFactory apiFactory,
             TwitchClient client,
             TwitchSettings settings)
@@ -41,6 +43,7 @@ namespace TwitchEbooks.Services
             _logger = logger;
             _contextFactory = contextFactory;
             _mediator = mediator;
+            _userService = userService;
             _apiFactory = apiFactory;
             _client = client;
             _settings = settings;
@@ -148,9 +151,9 @@ namespace TwitchEbooks.Services
             {
                 // handle commands that are meant for the bot's chatroom
                 if (chat.Message.StartsWith("~join"))
-                    await _mediator.Publish(new JoinNotification(userId));
+                    await _mediator.Send(new JoinRequest(userId));
                 else if (chat.Message.StartsWith("~leave"))
-                    await _mediator.Publish(new LeaveNotification(userId));
+                    await _mediator.Send(new LeaveRequest(userId));
             }
             else
             {
@@ -158,7 +161,7 @@ namespace TwitchEbooks.Services
                 if (chat.Message.StartsWith("~generate"))
                     await _mediator.Publish(new GenerateMessageNotification(channelId));
                 else if (chat.Message.StartsWith("~leave") && chat.IsBroadcaster)
-                    await _mediator.Publish(new LeaveNotification(channelId));
+                    await _mediator.Send(new LeaveRequest(channelId));
                 else if (chat.Message.StartsWith("~purge") && (chat.IsBroadcaster || chat.IsModerator))
                 {
                     var splitMsg = chat.Message.Split(' ');
@@ -180,15 +183,7 @@ namespace TwitchEbooks.Services
                     }
 
                     var userName = splitMsg[1].Trim();
-                    var api = _apiFactory.CreateApiClient();
-                    var usersResponse = await api.GetUsersAsync(_tokens.AccessToken, _settings.ClientId, logins: new List<string> { userName });
-                    if (usersResponse.Users.Length != 1)
-                    {
-                        await _mediator.Send(new SendMessageRequest(channelId, $"@{chat.Username} Couldn't find a user by the name of \"${userName}\", sorry!"));
-                        return;
-                    }
-
-                    var ignoreUserId = uint.Parse(usersResponse.Users[0].Id);
+                    var ignoreUserId = await _userService.GetIdByUsername(userName);
                     await _mediator.Publish(new IgnoreUserNotification(channelId, ignoreUserId));
                 }
                 else
