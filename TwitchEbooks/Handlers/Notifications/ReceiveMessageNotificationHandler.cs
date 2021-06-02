@@ -8,9 +8,9 @@ using System.Threading.Tasks;
 using TwitchEbooks.Database;
 using TwitchEbooks.Database.Models;
 using TwitchEbooks.Infrastructure;
-using TwitchEbooks.Models.Notifications;
+using TwitchEbooks.Models.MediatR.Notifications;
 
-namespace TwitchEbooks.Handlers
+namespace TwitchEbooks.Handlers.Notifications
 {
     public class ReceiveMessageNotificationHandler : INotificationHandler<ReceiveMessageNotification>
     {

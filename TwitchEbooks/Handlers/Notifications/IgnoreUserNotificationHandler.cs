@@ -8,9 +8,10 @@ using System.Threading.Tasks;
 using TwitchEbooks.Database;
 using TwitchEbooks.Database.Models;
 using TwitchEbooks.Infrastructure;
-using TwitchEbooks.Models.Notifications;
+using TwitchEbooks.Models.MediatR.Notifications;
+using TwitchEbooks.Models.MediatR.Requests;
 
-namespace TwitchEbooks.Handlers
+namespace TwitchEbooks.Handlers.Notifications
 {
     public class IgnoreUserNotificationHandler : INotificationHandler<IgnoreUserNotification>
     {
@@ -46,14 +47,12 @@ namespace TwitchEbooks.Handlers
                 ChannelId = channelId,
                 BannedOn = DateTime.UtcNow
             });
-            context.SaveChanges();
+            await context.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Now ignoring user {UserId} for channel {ChannelId}.", userId, channelId);
-            await _mediator.Publish(new SendMessageNotification(channelId, "Alrighty, I won't listen to them anymore! Gimme a moment to reticulate my splines..."), cancellationToken);
+            await _mediator.Send(new SendMessageRequest(channelId, "Alrighty, I won't listen to them anymore! Also, I'll forget all the things they've said up till now."), cancellationToken);
 
             // re-create the chain for the given channel
-            var messages = context.Messages.Where(m => m.ChannelId == channelId).AsAsyncEnumerable();
             await _chainService.AddOrUpdateChainForChannel(channelId);
-            await _mediator.Publish(new SendMessageNotification(channelId, "Ok, I'm all set and ready to go!"), cancellationToken);
         }
     }
 }

@@ -5,13 +5,12 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
 using TwitchEbooks.Models;
-using TwitchEbooks.Models.Notifications;
+using TwitchEbooks.Models.MediatR.Notifications;
+using TwitchEbooks.Models.MediatR.Requests;
 using TwitchEbooks.Twitch.Api;
 using TwitchEbooks.Twitch.Chat;
 using TwitchEbooks.Twitch.Chat.EventArgs;
@@ -23,7 +22,6 @@ namespace TwitchEbooks.Services
     {
         private readonly ILogger<TwitchService> _logger;
         private readonly IDbContextFactory<TwitchEbooksContext> _contextFactory;
-        private readonly IHttpClientFactory _httpClientFactory;
         private readonly IMediator _mediator;
         private readonly TwitchApiFactory _apiFactory;
         private readonly TwitchClient _client;
@@ -35,7 +33,6 @@ namespace TwitchEbooks.Services
         public TwitchService(
             ILogger<TwitchService> logger,
             IDbContextFactory<TwitchEbooksContext> contextFactory,
-            IHttpClientFactory httpClientFactory,
             IMediator mediator,
             TwitchApiFactory apiFactory,
             TwitchClient client,
@@ -43,7 +40,6 @@ namespace TwitchEbooks.Services
         {
             _logger = logger;
             _contextFactory = contextFactory;
-            _httpClientFactory = httpClientFactory;
             _mediator = mediator;
             _apiFactory = apiFactory;
             _client = client;
@@ -52,34 +48,18 @@ namespace TwitchEbooks.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            // get and keep the latest auth tokens
             using (var context = _contextFactory.CreateDbContext())
             {
-                // get and keep the latest auth tokens
                 _tokens = context.AccessTokens.OrderByDescending(a => a.CreatedOn).First();
+            }
 
-                // validate our tokens and refresh if necessary
-                var api = _apiFactory.CreateApiClient();
-                var response = await api.VerifyAccessTokenAsync(_tokens.AccessToken);
-                if (response is null)
-                {
-                    _logger.LogInformation("Refreshing tokens...");
-                    var refreshResponse = await api.RefreshTokensAsync(_tokens.RefreshToken, _settings.ClientId, _settings.ClientSecret);
-                    var createdOn = DateTime.UtcNow;
-
-                    _tokens = new Database.Models.UserAccessToken
-                    {
-                        UserId = _tokens.UserId,
-                        AccessToken = refreshResponse.AccessToken,
-                        RefreshToken = refreshResponse.RefreshToken,
-                        ExpiresIn = refreshResponse.ExpiresIn,
-                        CreatedOn = createdOn
-                    };
-
-                    // api.Settings.AccessToken = tokens.AccessToken;
-                    context.AccessTokens.Add(_tokens);
-                    context.SaveChanges();
-                    _logger.LogInformation("Tokens refreshed!");
-                }
+            // validate our tokens and refresh if necessary
+            var api = _apiFactory.CreateApiClient();
+            var response = await api.VerifyAccessTokenAsync(_tokens.AccessToken);
+            if (response is null)
+            {
+                _tokens = await _mediator.Send(new RefreshTokensRequest(), stoppingToken);
             }
 
             // hook up events
@@ -154,7 +134,7 @@ namespace TwitchEbooks.Services
             if (_tokens.UserId == giftSub.RecipientId && _client.JoinedChannels.Contains(giftSub.Channel))
             {
                 _logger.LogInformation("We got gifted a subscription to channel {Id}!", giftSub.RoomId);
-                await _mediator.Publish(new SendMessageNotification(giftSub.RoomId, $"🎉 Thanks for the gift sub @{giftSub.SenderDisplayName}! 🎉"));
+                await _mediator.Send(new SendMessageRequest(giftSub.RoomId, $"🎉 Thanks for the gift sub @{giftSub.SenderDisplayName}! 🎉"));
                 await _mediator.Publish(new GenerateMessageNotification(giftSub.RoomId));
             }
         }
@@ -184,7 +164,7 @@ namespace TwitchEbooks.Services
                     var splitMsg = chat.Message.Split(' ');
                     if (splitMsg.Length <= 1 || string.IsNullOrWhiteSpace(splitMsg[1]))
                     {
-                        await _mediator.Publish(new SendMessageNotification(channelId, $"@{chat.Username} You have to include a word to purge!"));
+                        await _mediator.Send(new SendMessageRequest(channelId, $"@{chat.Username} You have to include a word to purge!"));
                         return;
                     }
 
@@ -195,7 +175,7 @@ namespace TwitchEbooks.Services
                     var splitMsg = chat.Message.Split(' ');
                     if (splitMsg.Length <= 1 || string.IsNullOrWhiteSpace(splitMsg[1]))
                     {
-                        await _mediator.Publish(new SendMessageNotification(channelId, $"@{chat.Username} You have to include a username to ban!"));
+                        await _mediator.Send(new SendMessageRequest(channelId, $"@{chat.Username} You have to include a username to ban!"));
                         return;
                     }
 
@@ -204,7 +184,7 @@ namespace TwitchEbooks.Services
                     var usersResponse = await api.GetUsersAsync(_tokens.AccessToken, _settings.ClientId, logins: new List<string> { userName });
                     if (usersResponse.Users.Length != 1)
                     {
-                        await _mediator.Publish(new SendMessageNotification(channelId, $"@{chat.Username} Couldn't find a user by the name of \"${userName}\", sorry!"));
+                        await _mediator.Send(new SendMessageRequest(channelId, $"@{chat.Username} Couldn't find a user by the name of \"${userName}\", sorry!"));
                         return;
                     }
 
@@ -226,29 +206,11 @@ namespace TwitchEbooks.Services
 
             // wait until it's *really* disconnected
             while (_client.IsConnected) { }
+            _logger.LogInformation("Client disconnected unexpectedly!");
 
-            _logger.LogInformation("Client disconnected unexpectedly, refreshing tokens...");
-            var api = _apiFactory.CreateApiClient();
-            var refreshResponse = await api.RefreshTokensAsync(_tokens.RefreshToken, _settings.ClientId, _settings.ClientSecret);
-            var createdOn = DateTime.UtcNow;
-
-            // save new tokens to database
-            using (var context = _contextFactory.CreateDbContext()) {
-                context.AccessTokens.Add(new Database.Models.UserAccessToken
-                {
-                    UserId = _tokens.UserId,
-                    AccessToken = refreshResponse.AccessToken,
-                    RefreshToken = refreshResponse.RefreshToken,
-                    ExpiresIn = refreshResponse.ExpiresIn,
-                    CreatedOn = createdOn
-                });
-                await context.SaveChangesAsync();
-            }
-
-            // set API access token and new credentials and reconnect to chat
-            // _apiFactory.Settings.AccessToken = refreshResponse.AccessToken;
-            // _client.SetConnectionCredentials(new ConnectionCredentials(validateResponse.Login, refreshResponse.AccessToken));
-            await _client.ReconnectAsync(accessToken: refreshResponse.AccessToken);
+            // refresh tokens and reconnect to chat
+            _tokens = await _mediator.Send(new RefreshTokensRequest());
+            await _client.ReconnectAsync(accessToken: _tokens.AccessToken);
         }
     }
 }

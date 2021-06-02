@@ -6,7 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
-using TwitchEbooks.Models.Notifications;
+using TwitchEbooks.Models.MediatR.Requests;
 
 namespace TwitchEbooks.Infrastructure
 {
@@ -41,7 +41,7 @@ namespace TwitchEbooks.Infrastructure
                 var channelId = await _queue.DequeueAsync(stoppingToken);
                 var message = _chainService.GenerateMessage(channelId);
                 _logger.LogInformation("Generated message for channel {Id}.", channelId);
-                await _mediator.Publish(new SendMessageNotification(channelId, message), stoppingToken);
+                await _mediator.Send(new SendMessageRequest(channelId, message), stoppingToken);
             }
         }
 

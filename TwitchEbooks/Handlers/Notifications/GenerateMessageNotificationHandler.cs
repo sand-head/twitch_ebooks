@@ -3,9 +3,9 @@ using Microsoft.Extensions.Logging;
 using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Infrastructure;
-using TwitchEbooks.Models.Notifications;
+using TwitchEbooks.Models.MediatR.Notifications;
 
-namespace TwitchEbooks.Handlers
+namespace TwitchEbooks.Handlers.Notifications
 {
     public class GenerateMessageNotificationHandler : INotificationHandler<GenerateMessageNotification>
     {

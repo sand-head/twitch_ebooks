@@ -63,6 +63,7 @@ namespace TwitchEbooks
                     services
                         .AddSingleton<TwitchApiFactory>()
                         .AddSingleton<TwitchClient>()
+                        .AddSingleton<ITwitchUserService, TwitchUserService>()
                         .AddMediatR(typeof(Program))
                         .AddSingleton<MessageGenerationQueue>()
                         .AddSingleton<IMarkovChainService, MarkovChainService>();

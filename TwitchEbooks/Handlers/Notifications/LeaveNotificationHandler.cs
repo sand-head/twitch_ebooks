@@ -1,43 +1,36 @@
 ﻿using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
-using TwitchEbooks.Database.Models;
 using TwitchEbooks.Infrastructure;
-using TwitchEbooks.Models;
-using TwitchEbooks.Models.Notifications;
-using TwitchEbooks.Twitch.Api;
+using TwitchEbooks.Models.MediatR.Notifications;
 using TwitchEbooks.Twitch.Chat;
 
-namespace TwitchEbooks.Handlers
+namespace TwitchEbooks.Handlers.Notifications
 {
     public class LeaveNotificationHandler : INotificationHandler<LeaveNotification>
     {
         private readonly ILogger<LeaveNotificationHandler> _logger;
         private readonly IDbContextFactory<TwitchEbooksContext> _contextFactory;
         private readonly IMarkovChainService _chainService;
-        private readonly TwitchApi _twitchApi;
+        private readonly ITwitchUserService _userService;
         private readonly TwitchClient _twitchClient;
-        private readonly TwitchSettings _twitchSettings;
 
         public LeaveNotificationHandler(
             ILogger<LeaveNotificationHandler> logger,
             IDbContextFactory<TwitchEbooksContext> contextFactory,
             IMarkovChainService chainService,
-            TwitchApi twitchApi,
-            TwitchClient twitchClient,
-            TwitchSettings twitchSettings)
+            ITwitchUserService userService,
+            TwitchClient twitchClient)
         {
             _logger = logger;
             _contextFactory = contextFactory;
             _chainService = chainService;
-            _twitchApi = twitchApi;
+            _userService = userService;
             _twitchClient = twitchClient;
-            _twitchSettings = twitchSettings;
         }
 
         public async Task Handle(LeaveNotification notification, CancellationToken cancellationToken)
@@ -49,19 +42,13 @@ namespace TwitchEbooks.Handlers
 
             // disconnect from channel on Twitch
             // make sure a user exists on Twitch first
-            var tokens = context.AccessTokens.OrderByDescending(t => t.CreatedOn).First();
-            var usersResponse = await _twitchApi.GetUsersAsync(tokens.AccessToken, _twitchSettings.ClientId, ids: new List<string> { notification.ChannelId.ToString() });
-            if (usersResponse.Users.Length == 1)
-            {
-                var user = usersResponse.Users[0];
-                await _twitchClient.LeaveChannelAsync(user.Login);
-            }
+            var channelName = await _userService.GetUsernameById(notification.ChannelId);
+
+            // leave channel on Twitch client
+            await _twitchClient.LeaveChannelAsync(channelName);
 
             // remove channel from database
-            context.Channels.Add(new TwitchChannel
-            {
-                Id = notification.ChannelId
-            });
+            context.Channels.Remove(channel);
             await context.SaveChangesAsync(cancellationToken);
 
             // also remove their Markov chain

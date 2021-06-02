@@ -6,9 +6,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
 using TwitchEbooks.Infrastructure;
-using TwitchEbooks.Models.Notifications;
+using TwitchEbooks.Models.MediatR.Notifications;
 
-namespace TwitchEbooks.Handlers
+namespace TwitchEbooks.Handlers.Notifications
 {
     public class PurgeWordNotificationHandler : INotificationHandler<PurgeWordNotification>
     {
