@@ -13,7 +13,7 @@ namespace TwitchEbooks.Twitch.Extensions
                 "375" => new TwitchMessage.MotdStart(),
                 "372" => new TwitchMessage.Motd(Message: ircMessage.Parameters[1]),
                 "376" => new TwitchMessage.EndOfMotd(),
-                "353" => new TwitchMessage.NameReply(Users: ircMessage.Parameters),
+                "353" => new TwitchMessage.NameReply(Users: ircMessage.Parameters.ToArray()),
                 "366" => new TwitchMessage.EndOfNames(),
                 "421" => new TwitchMessage.UnknownCommand(Message: ircMessage.Parameters[0]),
                 "PING" => new TwitchMessage.Ping(Server: ircMessage.Parameters[0]),

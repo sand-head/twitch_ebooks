@@ -26,7 +26,7 @@ namespace TwitchEbooks.Twitch.Chat.Messages
         /// <summary>
         /// Represents command "353".
         /// </summary>
-        public record NameReply(List<string> Users) : TwitchMessage;
+        public record NameReply(string[] Users) : TwitchMessage;
         /// <summary>
         /// Represents command "366".
         /// </summary>
