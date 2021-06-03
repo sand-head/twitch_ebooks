@@ -113,7 +113,7 @@ namespace TwitchEbooks.Twitch.Chat
             }
         }
 
-        public async Task<TMessage> ReadMessageAsync<TMessage>(Predicate<TMessage> predicate = default, CancellationToken token = default) where TMessage : TwitchMessage
+        public async ValueTask<TMessage> ReadMessageAsync<TMessage>(Predicate<TMessage> predicate = default, CancellationToken token = default) where TMessage : TwitchMessage
         {
             using var comboToken = CancellationTokenSource.CreateLinkedTokenSource(_tokenSource.Token, token);
 

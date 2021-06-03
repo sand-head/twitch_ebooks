@@ -66,6 +66,7 @@ namespace TwitchEbooks
                         .AddSingleton<TwitchClient>()
                         .AddSingleton<ITwitchUserService, TwitchUserService>()
                         .AddMediatR(typeof(Program))
+                        .AddTransient(typeof(IPipelineBehavior<,>), typeof(RequiresTwitchAuthBehavior<,>))
                         .AddSingleton<MessageGenerationQueue>()
                         .AddSingleton<IMarkovChainService, MarkovChainService>();
 
