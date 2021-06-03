@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
@@ -44,7 +45,16 @@ namespace TwitchEbooks.Handlers.Requests
                 return Unit.Value;
 
             // make sure a user exists on Twitch first
-            var channelName = await _userService.GetUsernameById(channelId);
+            string channelName;
+            try
+            {
+                channelName = await _userService.GetUsernameById(channelId);
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogWarning(ex, "Could not obtain channel name from API, response did not indicate success");
+                throw;
+            }
 
             // add channel to database
             context.Channels.Add(new TwitchChannel

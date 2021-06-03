@@ -1,5 +1,6 @@
 ﻿using MediatR;
 using Microsoft.Extensions.Logging;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Infrastructure;
@@ -29,7 +30,16 @@ namespace TwitchEbooks.Handlers.Requests
         public async Task<Unit> Handle(SendMessageRequest request, CancellationToken cancellationToken)
         {
             var (channelId, message) = request;
-            var channelName = await _userService.GetUsernameById(channelId);
+            string channelName;
+            try
+            {
+                channelName = await _userService.GetUsernameById(channelId);
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogWarning(ex, "Could not obtain channel name from API, response did not indicate success");
+                throw;
+            }
 
             await _client.SendChatMessageAsync(channelName, message, cancellationToken);
             _logger.LogInformation("Sent message to channel {Id}.", channelId);
