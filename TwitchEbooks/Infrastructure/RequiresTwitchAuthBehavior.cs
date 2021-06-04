@@ -11,7 +11,7 @@ using TwitchEbooks.Models.MediatR.Requests;
 
 namespace TwitchEbooks.Infrastructure
 {
-    public class RequiresTwitchAuthBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse> where TRequest : IRequest<TResponse>
+    public class RequiresTwitchAuthBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     {
         private readonly ILogger<RequiresTwitchAuthBehavior<TRequest, TResponse>> _logger;
         private readonly IMediator _mediator;
@@ -28,6 +28,7 @@ namespace TwitchEbooks.Infrastructure
             if (requiresAuthAttribute is null)
                 return await next();
 
+            _logger.LogInformation("Handling {Type} request with RequiresTwitchAuthAttribute...", request.GetType());
             return await Policy.Handle<HttpRequestException>()
                 .WaitAndRetryAsync(
                     retryCount: 1,
