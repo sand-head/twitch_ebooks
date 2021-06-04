@@ -7,13 +7,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
 using TwitchEbooks.Infrastructure;
-using TwitchEbooks.Models.Attributes;
 using TwitchEbooks.Models.MediatR.Requests;
 using TwitchEbooks.Twitch.Chat;
 
 namespace TwitchEbooks.Handlers.Requests
 {
-    [RequiresTwitchAuth]
     public class LeaveRequestHandler : IRequestHandler<LeaveRequest>
     {
         private readonly ILogger<LeaveRequestHandler> _logger;

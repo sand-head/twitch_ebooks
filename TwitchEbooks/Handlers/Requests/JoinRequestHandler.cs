@@ -8,13 +8,11 @@ using System.Threading.Tasks;
 using TwitchEbooks.Database;
 using TwitchEbooks.Database.Models;
 using TwitchEbooks.Infrastructure;
-using TwitchEbooks.Models.Attributes;
 using TwitchEbooks.Models.MediatR.Requests;
 using TwitchEbooks.Twitch.Chat;
 
 namespace TwitchEbooks.Handlers.Requests
 {
-    [RequiresTwitchAuth]
     public class JoinRequestHandler : IRequestHandler<JoinRequest>
     {
         private readonly ILogger<JoinRequestHandler> _logger;
