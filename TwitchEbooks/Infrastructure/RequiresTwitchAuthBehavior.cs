@@ -24,11 +24,15 @@ namespace TwitchEbooks.Infrastructure
 
         public async Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken, RequestHandlerDelegate<TResponse> next)
         {
+            _logger.LogInformation("Entered RequiresTwitchAuthBehavior");
             var requiresAuthAttribute = typeof(TRequest).GetCustomAttribute<RequiresTwitchAuthAttribute>();
             if (requiresAuthAttribute is null)
+            {
+                _logger.LogInformation("Handler for {Request} does not have required attribute, moving on.", typeof(TRequest).Name);
                 return await next();
+            }
 
-            _logger.LogInformation("Handling {Type} request with RequiresTwitchAuthAttribute...", request.GetType());
+            _logger.LogInformation("Handling {Request} request with RequiresTwitchAuthAttribute...", typeof(TRequest).Name);
             return await Policy.Handle<HttpRequestException>()
                 .WaitAndRetryAsync(
                     retryCount: 1,
