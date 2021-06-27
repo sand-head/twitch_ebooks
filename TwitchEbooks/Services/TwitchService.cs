@@ -86,7 +86,7 @@ namespace TwitchEbooks.Services
                             await TwitchClient_OnConnected();
                             break;
                         case TwitchMessage.Join join:
-                            _logger.LogInformation("{User} has joined channel {Channel}.", join.Username, join.Channel);
+                            _logger.LogDebug("{User} has joined channel {Channel}.", join.Username, join.Channel);
                             break;
                         case TwitchMessage.Chat chat:
                             await TwitchClient_OnMessageReceived(chat);
@@ -98,7 +98,7 @@ namespace TwitchEbooks.Services
                             await TwitchClient_OnGiftedSubscription(giftSub);
                             break;
                         case TwitchMessage.Part part:
-                            _logger.LogInformation("{User} has left channel {Channel}.", part.Username, part.Channel);
+                            _logger.LogDebug("{User} has left channel {Channel}.", part.Username, part.Channel);
                             break;
                     }
                 }
@@ -115,7 +115,7 @@ namespace TwitchEbooks.Services
 
         private void TwitchClient_OnLog(object sender, string e)
         {
-            _logger.LogInformation(e);
+            _logger.LogDebug(e);
         }
 
         private async Task TwitchClient_OnConnected()
