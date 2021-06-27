@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
+using Serilog.Sinks.SystemConsole.Themes;
 using System;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
@@ -23,12 +24,16 @@ namespace TwitchEbooks
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Override("Microsoft.EntityFrameworkCore.Database.Command", LogEventLevel.Warning)
                 .Enrich.FromLogContext()
-                .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] <{SourceContext}> {Message:lj}{NewLine}{Exception}")
+                .WriteTo.Console(
+                    outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] <{SourceContext}> {Message:lj}{NewLine}{Exception}",
+                    theme: AnsiConsoleTheme.Code,
+                    applyThemeToRedirectedOutput: true)
                 .CreateLogger();
+            var logger = Log.ForContext<Program>();
 
             try
             {
-                Log.Information("Starting host...");
+                logger.Information("Starting host...");
                 var host = CreateHostBuilder(args).Build();
                 MigrateDatabase(host);
                 await StartWebHostIfFirstRunAsync(host);
@@ -36,7 +41,7 @@ namespace TwitchEbooks
             }
             catch (Exception ex)
             {
-                Log.Fatal(ex, "Host terminated unexpectedly.");
+                logger.Fatal(ex, "Host terminated unexpectedly.");
             }
             finally
             {
@@ -75,7 +80,14 @@ namespace TwitchEbooks
                         .AddHostedService<MessageGenerationService>()
                         .AddHostedService<TwitchService>();
                 })
-                .UseSerilog();
+                .UseSerilog((context, services, configuration) => configuration
+                    .ReadFrom.Configuration(context.Configuration)
+                    .ReadFrom.Services(services)
+                    .Enrich.FromLogContext()
+                    .WriteTo.Console(
+                        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] <{SourceContext}> {Message:lj}{NewLine}{Exception}",
+                        theme: AnsiConsoleTheme.Code,
+                        applyThemeToRedirectedOutput: true));
 
         static void MigrateDatabase(IHost host)
         {
