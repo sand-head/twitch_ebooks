@@ -52,7 +52,7 @@ namespace TwitchEbooks.Handlers.Notifications
             await _mediator.Send(new SendMessageRequest(channelId, "Alrighty, I won't listen to them anymore! Also, I'll forget all the things they've said up till now."), cancellationToken);
 
             // re-create the chain for the given channel
-            await _chainService.AddOrUpdateChainForChannel(channelId);
+            await _chainService.AddChainForChannelAsync(channelId, cancellationToken);
         }
     }
 }

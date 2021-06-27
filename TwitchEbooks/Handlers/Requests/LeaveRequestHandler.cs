@@ -63,7 +63,7 @@ namespace TwitchEbooks.Handlers.Requests
             await context.SaveChangesAsync(cancellationToken);
 
             // also remove their Markov chain
-            _chainService.RemoveChainForChannel(channelId);
+            await _chainService.RemoveChainForChannelAsync(channelId, cancellationToken);
             return Unit.Value;
         }
     }

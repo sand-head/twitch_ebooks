@@ -47,7 +47,7 @@ namespace TwitchEbooks.Handlers.Notifications
             context.Messages.Add(twitchMsg);
             await context.SaveChangesAsync(cancellationToken);
 
-            _chainService.AddMessage(twitchMsg.ChannelId, twitchMsg.Message);
+            await _chainService.AddMessageAsync(twitchMsg.ChannelId, twitchMsg.Message, cancellationToken);
         }
     }
 }

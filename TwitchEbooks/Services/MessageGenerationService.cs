@@ -39,7 +39,7 @@ namespace TwitchEbooks.Infrastructure
             while (!stoppingToken.IsCancellationRequested)
             {
                 var channelId = await _queue.DequeueAsync(stoppingToken);
-                var message = _chainService.GenerateMessage(channelId);
+                var message = await _chainService.GenerateMessageAsync(channelId);
                 _logger.LogInformation("Generated message for channel {Id}.", channelId);
                 await _mediator.Send(new SendMessageRequest(channelId, message), stoppingToken);
             }
@@ -48,10 +48,9 @@ namespace TwitchEbooks.Infrastructure
         private async Task InitializeChains(CancellationToken stoppingToken)
         {
             var context = _contextFactory.CreateDbContext();
-            var channels = await context.Channels.ToListAsync(stoppingToken);
+            var channels = await context.Channels.Select(c => c.Id).ToListAsync(stoppingToken);
 
-            var tasks = channels.Select(c => _chainService.AddOrUpdateChainForChannel(c.Id));
-            await Task.WhenAll(tasks);
+            await _chainService.AddChainsForChannelsAsync(channels);
         }
     }
 }

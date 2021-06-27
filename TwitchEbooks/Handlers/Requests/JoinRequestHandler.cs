@@ -64,7 +64,7 @@ namespace TwitchEbooks.Handlers.Requests
             // connect to channel on Twitch client
             await _twitchClient.JoinChannelAsync(channelName, cancellationToken);
             // also create a Markov chain
-            await _chainService.AddOrUpdateChainForChannel(channelId);
+            await _chainService.AddChainForChannelAsync(channelId, cancellationToken);
             return Unit.Value;
         }
     }

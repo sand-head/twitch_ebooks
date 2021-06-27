@@ -38,7 +38,7 @@ namespace TwitchEbooks.Handlers.Notifications
             _logger.LogInformation("Purged {Count} messages from channel {Id}.", count, channelId);
 
             // re-create the pool for the given channel
-            await _chainService.AddOrUpdateChainForChannel(channelId);
+            await _chainService.AddChainForChannelAsync(channelId, cancellationToken);
         }
     }
 }
