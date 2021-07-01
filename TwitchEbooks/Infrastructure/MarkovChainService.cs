@@ -64,11 +64,11 @@ namespace TwitchEbooks.Infrastructure
         public async Task RemoveChainForChannelAsync(uint channelId, CancellationToken token = default)
         {
             await _readerWriterLock.AcquireWriterLock(token);
-            if (!_channelChains.ContainsKey(channelId))
-                throw new Exception("Could not remove chain, as one for the given channel does not exist.");
 
             try
             {
+                if (!_channelChains.ContainsKey(channelId))
+                    throw new Exception("Could not remove chain, as one for the given channel does not exist.");
                 _channelChains.Remove(channelId, out var _);
             }
             finally
@@ -80,11 +80,11 @@ namespace TwitchEbooks.Infrastructure
         public async Task AddMessageAsync(uint channelId, string message, CancellationToken token = default)
         {
             await _readerWriterLock.AcquireWriterLock(token);
-            if (!_channelChains.ContainsKey(channelId))
-                throw new Exception("Could not add message as chain for given channel does not exist.");
 
             try
             {
+                if (!_channelChains.ContainsKey(channelId))
+                    throw new Exception("Could not add message as chain for given channel does not exist.");
                 _channelChains[channelId].Add(message.Split(' '));
             }
             finally
@@ -96,11 +96,11 @@ namespace TwitchEbooks.Infrastructure
         public async Task<string> GenerateMessageAsync(uint channelId, CancellationToken token = default)
         {
             await _readerWriterLock.AcquireReaderLock(token);
-            if (!_channelChains.ContainsKey(channelId))
-                return null;
 
             try
             {
+                if (!_channelChains.ContainsKey(channelId))
+                    return null;
                 return string.Join(' ', _channelChains[channelId].Chain());
             }
             finally
