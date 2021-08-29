@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Polly;
 using System;
+using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Threading;
@@ -30,11 +31,18 @@ namespace TwitchEbooks.Infrastructure
 
             return await Policy.Handle<HttpRequestException>()
                 .WaitAndRetryAsync(
-                    retryCount: 1,
+                    retryCount: 5,
                     sleepDurationProvider: i => TimeSpan.FromMilliseconds(i * 500),
                     onRetryAsync: async (exception, timeSpan) =>
                     {
-                        _logger.LogWarning(exception, "Request {Request} failed to authenticate with Twitch, retrying after {TotalSeconds} second(s)...", typeof(TRequest).Name, timeSpan.TotalSeconds);
+                        if (exception is HttpRequestException requestException && requestException.StatusCode == HttpStatusCode.Unauthorized)
+                        {
+                            _logger.LogInformation("Request {Request} failed to authenticate with Twitch, retrying after {TotalSeconds} second(s)...", typeof(TRequest).Name, timeSpan.TotalSeconds);
+                        }
+                        else
+                        {
+                            _logger.LogWarning(exception, "Request {Request} threw an exception, retrying after {TotalSeconds} second(s)...", typeof(TRequest).Name, timeSpan.TotalSeconds);
+                        }
                         await _mediator.Send(new RefreshTokensRequest());
                     })
                 .ExecuteAsync(async () => await next());

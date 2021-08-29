@@ -46,6 +46,7 @@ namespace TwitchEbooks.Twitch.Chat.Messages
             Guid TargetMessageId,
             string Channel,
             string Message) : TwitchMessage;
+        public record Reconnect() : TwitchMessage;
         public record RoomState(
             bool EmoteOnly,
             bool FollowersOnly,

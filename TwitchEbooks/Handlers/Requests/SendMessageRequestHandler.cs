@@ -1,5 +1,6 @@
 ﻿using MediatR;
 using Microsoft.Extensions.Logging;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -33,9 +34,9 @@ namespace TwitchEbooks.Handlers.Requests
             {
                 channelName = await _userService.GetUsernameById(channelId);
             }
-            catch (HttpRequestException ex)
+            catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
             {
-                _logger.LogWarning(ex, "Could not obtain channel name from API, response did not indicate success");
+                _logger.LogInformation("Could not obtain channel name from API, need to refresh tokens first");
                 throw;
             }
 

@@ -62,13 +62,7 @@ namespace TwitchEbooks.Twitch.Chat
             _accessToken = accessToken ?? throw new ArgumentNullException(nameof(accessToken));
             _joinedChannels = new List<string>();
 
-            using var comboToken = CancellationTokenSource.CreateLinkedTokenSource(_tokenSource.Token, token);
-            await _client.ConnectAsync(_serverUri, comboToken.Token);
-            await SendRawMessageAsync($"PASS oauth:{accessToken}");
-            await SendRawMessageAsync($"NICK {username}");
-            await SendRawMessageAsync("CAP REQ :twitch.tv/tags");
-            await SendRawMessageAsync("CAP REQ :twitch.tv/commands");
-            await SendRawMessageAsync("CAP REQ :twitch.tv/membership");
+            await ConnectAsyncCore(token);
             // OnConnected?.Invoke();
             _messageReadLoop = MessageReadLoop();
             _messageSendLoop = MessageSendLoop();
@@ -148,9 +142,21 @@ namespace TwitchEbooks.Twitch.Chat
             GC.Collect();
         }
 
+        private async Task ConnectAsyncCore(CancellationToken token = default)
+        {
+            using var comboToken = CancellationTokenSource.CreateLinkedTokenSource(_tokenSource.Token, token);
+            await _client.ConnectAsync(_serverUri, comboToken.Token);
+            await SendRawMessageAsync($"PASS oauth:{_accessToken}");
+            await SendRawMessageAsync($"NICK {_username}");
+            await SendRawMessageAsync("CAP REQ :twitch.tv/tags");
+            await SendRawMessageAsync("CAP REQ :twitch.tv/commands");
+            await SendRawMessageAsync("CAP REQ :twitch.tv/membership");
+        }
+
         private async Task MessageReadLoop()
         {
             var messages = "";
+            var shouldReconnect = false;
 
             while (IsConnected && !_tokenSource.IsCancellationRequested)
             {
@@ -202,10 +208,18 @@ namespace TwitchEbooks.Twitch.Chat
                             _joinedChannels.Add(joinMsg.Channel);
                         else if (twitchMessage is TwitchMessage.Part partMsg && _username == partMsg.Username)
                             _joinedChannels.Remove(partMsg.Channel);
+                        else if (twitchMessage is TwitchMessage.Reconnect)
+                            shouldReconnect = true;
 
                         await _incomingMessageQueue.Writer.WriteAsync(twitchMessage, _tokenSource.Token);
                     }
                     messages = "";
+                }
+
+                // reconnect if we've disconnected after twitch send a Reconnect message
+                if (shouldReconnect && !IsConnected && !_tokenSource.IsCancellationRequested)
+                {
+                    await ConnectAsyncCore();
                 }
             }
 

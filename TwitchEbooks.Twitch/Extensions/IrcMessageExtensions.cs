@@ -23,6 +23,7 @@ namespace TwitchEbooks.Twitch.Extensions
                     TargetMessageId: Guid.Parse(ircMessage.Tags["target-msg-id"]),
                     Channel: ircMessage.Parameters[0][1..],
                     Message: ircMessage.Parameters[1]),
+                "RECONNECT" => new TwitchMessage.Reconnect(),
                 "ROOMSTATE" => new TwitchMessage.RoomState(
                     EmoteOnly: ircMessage.Tags["emote-only"] == "1",
                     FollowersOnly: ircMessage.Tags["followers-only"] != "-1",
