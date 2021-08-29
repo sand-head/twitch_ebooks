@@ -67,7 +67,6 @@ namespace TwitchEbooks.Services
 
             // hook up events
             _client.OnDisconnected += TwitchClient_OnDisconnected;
-            _client.OnLog += TwitchClient_OnLog;
 
             // connect to Twitch
             _logger.LogInformation("Connecting to Twitch...");

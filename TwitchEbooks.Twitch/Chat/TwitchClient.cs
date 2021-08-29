@@ -1,4 +1,5 @@
 ﻿using ComposableAsync;
+using Microsoft.Extensions.Logging;
 using RateLimiter;
 using System;
 using System.Collections.Generic;
@@ -18,6 +19,7 @@ namespace TwitchEbooks.Twitch.Chat
     /// </summary>
     public class TwitchClient
     {
+        private readonly ILogger<TwitchClient> _logger;
         private readonly ClientWebSocket _client;
         private readonly CancellationTokenSource _tokenSource;
         private readonly Channel<TwitchMessage> _incomingMessageQueue;
@@ -30,8 +32,9 @@ namespace TwitchEbooks.Twitch.Chat
 
         private Task _messageReadLoop, _messageSendLoop, _joinLoop;
 
-        public TwitchClient()
+        public TwitchClient(ILogger<TwitchClient> logger = null)
         {
+            _logger = logger;
             _client = new ClientWebSocket();
             _tokenSource = new CancellationTokenSource();
 
@@ -53,7 +56,6 @@ namespace TwitchEbooks.Twitch.Chat
         public IReadOnlyList<string> JoinedChannels => _joinedChannels;
 
         public event EventHandler<OnDisconnectedEventArgs> OnDisconnected;
-        public event EventHandler<string> OnLog;
 
         public async Task ConnectAsync(string username, string accessToken, string serverUri = "wss://irc-ws.chat.twitch.tv:443", CancellationToken token = default)
         {
@@ -103,7 +105,7 @@ namespace TwitchEbooks.Twitch.Chat
             }
             catch (Exception e)
             {
-                OnLog?.Invoke(this, $"Exception occured when sending WebSocket message {message}: {e.Message}");
+                _logger?.LogWarning(e, "Exception occurred when sending WebSocket message: {Message}", message);
             }
         }
 
@@ -190,17 +192,17 @@ namespace TwitchEbooks.Twitch.Chat
                             // either the client is hooked up to fdgt (which has inconsistencies with Twitch's IRC interface)
                             // or something has unexpectedly changed in Twitch's responses due to an update
                             // either way, it's probably best to just log & continue here
-                            OnLog?.Invoke(this, $"Could not parse property value out of string: {e.Message}\n{e.StackTrace}");
+                            _logger?.LogInformation(e, "Could not parse property value out of string");
                             continue;
                         }
 
                         if (twitchMessage is null)
                         {
-                            OnLog?.Invoke(this, $"Received weird message: {message}");
+                            _logger?.LogInformation("Received unknown message: {Message}", message);
                             continue;
                         }
 
-                        OnLog?.Invoke(this, $"Received: {twitchMessage}");
+                        _logger?.LogDebug("Received: {Message}", twitchMessage);
                         // do some fun things internally so consumers don't have to deal with them
                         if (twitchMessage is TwitchMessage.Ping ping)
                             await SendRawMessageAsync($"PONG :{ping.Server}");
@@ -219,6 +221,7 @@ namespace TwitchEbooks.Twitch.Chat
                 // reconnect if we've disconnected after twitch send a Reconnect message
                 if (shouldReconnect && !IsConnected && !_tokenSource.IsCancellationRequested)
                 {
+                    _logger?.LogInformation("Reconnecting to Twitch...");
                     await ConnectAsyncCore();
                 }
             }
@@ -241,7 +244,7 @@ namespace TwitchEbooks.Twitch.Chat
             }
             catch (Exception e)
             {
-                OnLog?.Invoke("Exception occured in client message sending loop: {Message}", e.Message);
+                _logger?.LogWarning("Exception occured in client message sending loop: {Message}", e.Message);
             }
         }
 
@@ -260,7 +263,7 @@ namespace TwitchEbooks.Twitch.Chat
             }
             catch (Exception e)
             {
-                OnLog?.Invoke("Exception occured in client channel join loop: {Message}", e.Message);
+                _logger?.LogWarning("Exception occured in client channel join loop: {Message}", e.Message);
             }
         }
     }
