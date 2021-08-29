@@ -48,7 +48,15 @@ namespace TwitchEbooks
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
-                });
+                })
+                .UseSerilog((context, services, configuration) => configuration
+                    .ReadFrom.Configuration(context.Configuration)
+                    .ReadFrom.Services(services)
+                    .Enrich.FromLogContext()
+                    .WriteTo.Console(
+                        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] <{SourceContext}> {Message:lj}{NewLine}{Exception}",
+                        theme: AnsiConsoleTheme.Code,
+                        applyThemeToRedirectedOutput: true));
 
         static void MigrateDatabase(IHost host)
         {
