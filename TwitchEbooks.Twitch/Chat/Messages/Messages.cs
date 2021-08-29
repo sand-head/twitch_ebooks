@@ -41,6 +41,7 @@ namespace TwitchEbooks.Twitch.Chat.Messages
         /// Represents the "CAP * ACK" response indicating a successful capacity request.
         /// </summary>
         public record CapAck(string Capability) : TwitchMessage;
+        public record ClearChat(int BanDuration, string Channel, string User) : TwitchMessage;
         public record ClearMsg(
             string Login,
             Guid TargetMessageId,

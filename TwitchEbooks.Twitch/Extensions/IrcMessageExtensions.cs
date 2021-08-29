@@ -18,6 +18,12 @@ namespace TwitchEbooks.Twitch.Extensions
                 "421" => new TwitchMessage.UnknownCommand(Message: ircMessage.Parameters[0]),
                 "PING" => new TwitchMessage.Ping(Server: ircMessage.Parameters[0]),
                 "CAP" when ircMessage.Parameters[1] == "ACK" => new TwitchMessage.CapAck(Capability: ircMessage.Parameters[2]),
+                "CLEARCHAT" => new TwitchMessage.ClearChat(
+                    BanDuration: !string.IsNullOrEmpty(ircMessage.Tags["ban-duration"])
+                        ? int.Parse(ircMessage.Tags["ban-duration"])
+                        : -1,
+                    Channel: ircMessage.Parameters[0][1..],
+                    User: ircMessage.Parameters[1]),
                 "CLEARMSG" => new TwitchMessage.ClearMsg(
                     Login: ircMessage.Tags["login"],
                     TargetMessageId: Guid.Parse(ircMessage.Tags["target-msg-id"]),

@@ -91,8 +91,19 @@ namespace TwitchEbooks.Services
                         case TwitchMessage.Chat chat:
                             await TwitchClient_OnMessageReceived(chat);
                             break;
+                        case TwitchMessage.ClearChat clearChat:
+                            var channelId = await _userService.GetIdByUsername(clearChat.Channel);
+                            if (string.IsNullOrWhiteSpace(clearChat.User))
+                            {
+                                // todo: clear the entire channel's history
+                            }
+                            else
+                            {
+                                await _mediator.Send(new BanUserRequest(clearChat.Channel, clearChat.User), stoppingToken);
+                            }
+                            break;
                         case TwitchMessage.ClearMsg clearMsg:
-                            // todo: delete message from database, rebuild chain
+                            await _mediator.Send(new DeleteMessageNotification(clearMsg.TargetMessageId), stoppingToken);
                             break;
                         case TwitchMessage.GiftSub giftSub:
                             await TwitchClient_OnGiftedSubscription(giftSub);
@@ -128,17 +139,6 @@ namespace TwitchEbooks.Services
             {
                 _logger.LogInformation("Joining channel {Name}...", user.Login);
                 await _client.JoinChannelAsync(user.Login);
-            }
-        }
-
-        private async Task TwitchClient_OnGiftedSubscription(TwitchMessage.GiftSub giftSub)
-        {
-            // if the gift sub is to a channel we're in (and it's for the bot), send the celebratory messages
-            if (_tokens.UserId == giftSub.RecipientId && _client.JoinedChannels.Contains(giftSub.Channel))
-            {
-                _logger.LogInformation("We got gifted a subscription to channel {Id}!", giftSub.RoomId);
-                await _mediator.Send(new SendMessageRequest(giftSub.RoomId, $"🎉 Thanks for the gift sub @{giftSub.SenderDisplayName}! 🎉"));
-                await _mediator.Publish(new GenerateMessageNotification(giftSub.RoomId));
             }
         }
 
@@ -188,6 +188,17 @@ namespace TwitchEbooks.Services
                 }
                 else
                     await _mediator.Publish(new ReceiveMessageNotification(chat));
+            }
+        }
+
+        private async Task TwitchClient_OnGiftedSubscription(TwitchMessage.GiftSub giftSub)
+        {
+            // if the gift sub is to a channel we're in (and it's for the bot), send the celebratory messages
+            if (_tokens.UserId == giftSub.RecipientId && _client.JoinedChannels.Contains(giftSub.Channel))
+            {
+                _logger.LogInformation("We got gifted a subscription to channel {Id}!", giftSub.RoomId);
+                await _mediator.Send(new SendMessageRequest(giftSub.RoomId, $"🎉 Thanks for the gift sub @{giftSub.SenderDisplayName}! 🎉"));
+                await _mediator.Publish(new GenerateMessageNotification(giftSub.RoomId));
             }
         }
 
