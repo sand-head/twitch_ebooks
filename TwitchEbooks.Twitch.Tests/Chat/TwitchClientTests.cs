@@ -22,8 +22,7 @@ namespace TwitchEbooks.Twitch.Tests.Chat
         public async Task ConnectAsyncShouldSuccessfullyConnectToTwitch()
         {
             // Arrange
-            var client = new TwitchClient();
-            client.OnLog += (_, e) => _output.WriteLine(e);
+            var client = new TwitchClient(_output.BuildLoggerFor<TwitchClient>());
             TwitchMessage.Welcome welcome = null;
 
             var cts = new CancellationTokenSource();
@@ -48,8 +47,7 @@ namespace TwitchEbooks.Twitch.Tests.Chat
         public async Task JoinChannelShouldSuccessfullyJoinAChannel()
         {
             // Arrange
-            var client = new TwitchClient();
-            client.OnLog += (_, e) => _output.WriteLine(e);
+            var client = new TwitchClient(_output.BuildLoggerFor<TwitchClient>());
             TwitchMessage.Join join = null;
 
             var cts = new CancellationTokenSource();
@@ -79,8 +77,7 @@ namespace TwitchEbooks.Twitch.Tests.Chat
         public async Task TwitchClientShouldSupportReceivingGiftSubs()
         {
             // Arrange
-            var client = new TwitchClient();
-            client.OnLog += (_, e) => _output.WriteLine(e);
+            var client = new TwitchClient(_output.BuildLoggerFor<TwitchClient>());
             TwitchMessage.GiftSub giftSub = null;
 
             var cts = new CancellationTokenSource();
