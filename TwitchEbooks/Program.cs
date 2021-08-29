@@ -1,6 +1,5 @@
-﻿using MediatR;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
@@ -9,17 +8,12 @@ using Serilog.Sinks.SystemConsole.Themes;
 using System;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
-using TwitchEbooks.Infrastructure;
-using TwitchEbooks.Models;
-using TwitchEbooks.Services;
-using TwitchEbooks.Twitch.Api;
-using TwitchEbooks.Twitch.Chat;
 
 namespace TwitchEbooks
 {
-    class Program
+    public class Program
     {
-        static async Task Main(string[] args)
+        public static async Task Main(string[] args)
         {
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Override("Microsoft.EntityFrameworkCore.Database.Command", LogEventLevel.Warning)
@@ -49,45 +43,12 @@ namespace TwitchEbooks
             }
         }
 
-        static IHostBuilder CreateHostBuilder(string[] args) =>
+        public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
-                .ConfigureServices((context, services) =>
+                .ConfigureWebHostDefaults(webBuilder =>
                 {
-                    // Database context
-                    services.AddDbContext<TwitchEbooksContext>(options =>
-                        options.UseNpgsql(context.Configuration.GetConnectionString("PostgreSQL")),
-                        optionsLifetime: ServiceLifetime.Transient);
-                    services.AddDbContextFactory<TwitchEbooksContext, TwitchEbooksContextFactory>();
-
-                    // Configuration
-                    var twitchSettings = context.Configuration.GetSection("Twitch").Get<TwitchSettings>();
-                    services.AddSingleton(twitchSettings);
-
-                    // Misc. dependencies
-                    services.AddMemoryCache();
-                    services.AddHttpClient<TwitchApi>();
-                    services
-                        .AddSingleton<TwitchApiFactory>()
-                        .AddSingleton<TwitchClient>()
-                        .AddSingleton<ITwitchUserService, TwitchUserService>()
-                        .AddMediatR(typeof(Program))
-                        .AddScoped(typeof(IPipelineBehavior<,>), typeof(RequiresTwitchAuthBehavior<,>))
-                        .AddSingleton<MessageGenerationQueue>()
-                        .AddSingleton<IMarkovChainService, MarkovChainService>();
-
-                    // Hosted services
-                    services
-                        .AddHostedService<MessageGenerationService>()
-                        .AddHostedService<TwitchService>();
-                })
-                .UseSerilog((context, services, configuration) => configuration
-                    .ReadFrom.Configuration(context.Configuration)
-                    .ReadFrom.Services(services)
-                    .Enrich.FromLogContext()
-                    .WriteTo.Console(
-                        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] <{SourceContext}> {Message:lj}{NewLine}{Exception}",
-                        theme: AnsiConsoleTheme.Code,
-                        applyThemeToRedirectedOutput: true));
+                    webBuilder.UseStartup<Startup>();
+                });
 
         static void MigrateDatabase(IHost host)
         {
