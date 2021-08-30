@@ -123,11 +123,6 @@ namespace TwitchEbooks.Services
             _client.Disconnect();
         }
 
-        private void TwitchClient_OnLog(object sender, string e)
-        {
-            _logger.LogDebug(e);
-        }
-
         private async Task TwitchClient_OnConnected()
         {
             var context = _contextFactory.CreateDbContext();
