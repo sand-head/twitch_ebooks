@@ -195,6 +195,15 @@ namespace TwitchEbooks.Twitch.Chat
                             _logger?.LogInformation(e, "Could not parse property value out of string");
                             continue;
                         }
+                        catch (Exception e)
+                        {
+                            // if we get here there's something drastically wrong with either:
+                            // 1. the message
+                            // 2. the parser
+                            // so let's log an error and continue
+                            _logger?.LogError(e, "An unhandled exception occurred when parsing message {Message}", message);
+                            continue;
+                        }
 
                         if (twitchMessage is null)
                         {
