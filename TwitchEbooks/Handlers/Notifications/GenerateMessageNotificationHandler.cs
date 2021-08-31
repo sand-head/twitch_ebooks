@@ -21,7 +21,7 @@ namespace TwitchEbooks.Handlers.Notifications
         public async Task Handle(GenerateMessageNotification notification, CancellationToken cancellationToken)
         {
             _logger.LogInformation("Adding generation request for channel {Id} to queue.", notification.ChannelId);
-            await _queue.EnqueueAsync(notification.ChannelId, cancellationToken);
+            await _queue.EnqueueAsync(notification, cancellationToken);
         }
     }
 }

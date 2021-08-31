@@ -13,7 +13,7 @@ namespace TwitchEbooks.Models.MediatR.Requests
     [RequiresTwitchAuth]
     public record LeaveRequest(uint ChannelId) : IRequest;
     [RequiresTwitchAuth]
-    public record SendMessageRequest(uint ChannelId, string Message) : IRequest;
+    public record SendMessageRequest(uint ChannelId, string Message, Guid? InReplyTo = null) : IRequest;
 
     // things that are actually requests:
     public record RefreshTokensRequest() : IRequest<UserAccessToken>;

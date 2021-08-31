@@ -153,7 +153,7 @@ namespace TwitchEbooks.Services
             {
                 // handle commands that are meant for a user's chatroom
                 if (chat.Message.StartsWith("~generate"))
-                    await _mediator.Publish(new GenerateMessageNotification(channelId));
+                    await _mediator.Publish(new GenerateMessageNotification(channelId, chat.Id));
                 else if (chat.Message.StartsWith("~leave") && chat.IsBroadcaster)
                     await _mediator.Send(new LeaveRequest(channelId));
                 else if (chat.Message.StartsWith("~purge") && (chat.IsBroadcaster || chat.IsModerator))

@@ -23,7 +23,7 @@ namespace TwitchEbooks.Twitch.Chat
         private readonly ClientWebSocket _client;
         private readonly CancellationTokenSource _tokenSource;
         private readonly Channel<TwitchMessage> _incomingMessageQueue;
-        private readonly Channel<(string channelName, string message)> _outgoingMessageQueue;
+        private readonly Channel<(string channelName, string message, Guid? inReplyTo)> _outgoingMessageQueue;
         private readonly Channel<string> _joinQueue;
 
         private Uri _serverUri;
@@ -42,7 +42,7 @@ namespace TwitchEbooks.Twitch.Chat
             {
                 SingleWriter = true
             });
-            _outgoingMessageQueue = Channel.CreateBounded<(string channelName, string message)>(new BoundedChannelOptions(30)
+            _outgoingMessageQueue = Channel.CreateBounded<(string channelName, string message, Guid? inReplyTo)>(new BoundedChannelOptions(30)
             {
                 SingleReader = true
             });
@@ -87,9 +87,9 @@ namespace TwitchEbooks.Twitch.Chat
                 await SendRawMessageAsync($"PART #{channelName}");
         }
 
-        public async ValueTask SendChatMessageAsync(string channelName, string message, CancellationToken token = default)
+        public async ValueTask SendChatMessageAsync(string channelName, string message, Guid? inReplyTo = null, CancellationToken token = default)
         {
-            await _outgoingMessageQueue.Writer.WriteAsync((channelName, message), token);
+            await _outgoingMessageQueue.Writer.WriteAsync((channelName, message, inReplyTo), token);
         }
 
         public async Task SendRawMessageAsync(string message)
@@ -247,8 +247,12 @@ namespace TwitchEbooks.Twitch.Chat
                 while (IsConnected && !_tokenSource.IsCancellationRequested)
                 {
                     await rateLimit;
-                    var (channelName, message) = await _outgoingMessageQueue.Reader.ReadAsync(_tokenSource.Token);
-                    await SendRawMessageAsync($"PRIVMSG #{channelName} :{message}");
+                    var (channelName, message, inReplyTo) = await _outgoingMessageQueue.Reader.ReadAsync(_tokenSource.Token);
+
+                    if (inReplyTo != null)
+                        await SendRawMessageAsync($"@reply-parent-msg-id={inReplyTo} PRIVMSG #{channelName} :{message}");
+                    else
+                        await SendRawMessageAsync($"PRIVMSG #{channelName} :{message}");
                 }
             }
             catch (Exception e)

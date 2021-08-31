@@ -28,7 +28,7 @@ namespace TwitchEbooks.Handlers.Requests
 
         public async Task<Unit> Handle(SendMessageRequest request, CancellationToken cancellationToken)
         {
-            var (channelId, message) = request;
+            var (channelId, message, messageId) = request;
             string channelName;
             try
             {
@@ -40,7 +40,7 @@ namespace TwitchEbooks.Handlers.Requests
                 throw;
             }
 
-            await _client.SendChatMessageAsync(channelName, message, cancellationToken);
+            await _client.SendChatMessageAsync(channelName, message, messageId, cancellationToken);
             _logger.LogInformation("Sent message to channel {Id}.", channelId);
             return Unit.Value;
         }
