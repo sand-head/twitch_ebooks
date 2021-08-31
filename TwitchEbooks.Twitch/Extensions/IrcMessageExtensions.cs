@@ -19,7 +19,7 @@ namespace TwitchEbooks.Twitch.Extensions
                 "PING" => new TwitchMessage.Ping(Server: ircMessage.Parameters[0]),
                 "CAP" when ircMessage.Parameters[1] == "ACK" => new TwitchMessage.CapAck(Capability: ircMessage.Parameters[2]),
                 "CLEARCHAT" => new TwitchMessage.ClearChat(
-                    BanDuration: !string.IsNullOrEmpty(ircMessage.Tags["ban-duration"])
+                    BanDuration: ircMessage.Tags.ContainsKey("ban-duration") && !string.IsNullOrEmpty(ircMessage.Tags["ban-duration"])
                         ? int.Parse(ircMessage.Tags["ban-duration"])
                         : -1,
                     Channel: ircMessage.Parameters[0][1..],
