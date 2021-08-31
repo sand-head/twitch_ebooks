@@ -161,7 +161,7 @@ namespace TwitchEbooks.Services
                     var splitMsg = chat.Message.Split(' ');
                     if (splitMsg.Length <= 1 || string.IsNullOrWhiteSpace(splitMsg[1]))
                     {
-                        await _mediator.Send(new SendMessageRequest(channelId, $"@{chat.Username} You have to include a word to purge!"));
+                        await _mediator.Send(new SendMessageRequest(channelId, $"@{chat.Username} You have to include a word to purge!", chat.Id));
                         return;
                     }
 
@@ -172,7 +172,7 @@ namespace TwitchEbooks.Services
                     var splitMsg = chat.Message.Split(' ');
                     if (splitMsg.Length <= 1 || string.IsNullOrWhiteSpace(splitMsg[1]))
                     {
-                        await _mediator.Send(new SendMessageRequest(channelId, $"@{chat.Username} You have to include a username to ban!"));
+                        await _mediator.Send(new SendMessageRequest(channelId, $"@{chat.Username} You have to include a username to ban!", chat.Id));
                         return;
                     }
 
