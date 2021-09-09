@@ -120,7 +120,6 @@ namespace TwitchEbooks.Services
 
             _isStopping = true;
             _logger.LogInformation("Disconnecting from Twitch...");
-            _client.Disconnect();
         }
 
         private async Task TwitchClient_OnConnected()

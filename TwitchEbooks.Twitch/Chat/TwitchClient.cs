@@ -21,11 +21,11 @@ namespace TwitchEbooks.Twitch.Chat
     {
         private readonly ILogger<TwitchClient> _logger;
         private readonly ClientWebSocket _client;
-        private readonly CancellationTokenSource _tokenSource;
         private readonly Channel<TwitchMessage> _incomingMessageQueue;
         private readonly Channel<(string channelName, string message, Guid? inReplyTo)> _outgoingMessageQueue;
         private readonly Channel<string> _joinQueue;
 
+        private CancellationTokenSource _tokenSource;
         private Uri _serverUri;
         private string _username, _accessToken;
         private List<string> _joinedChannels;
@@ -36,7 +36,6 @@ namespace TwitchEbooks.Twitch.Chat
         {
             _logger = logger;
             _client = new ClientWebSocket();
-            _tokenSource = new CancellationTokenSource();
 
             _incomingMessageQueue = Channel.CreateUnbounded<TwitchMessage>(new UnboundedChannelOptions
             {
@@ -65,7 +64,6 @@ namespace TwitchEbooks.Twitch.Chat
             _joinedChannels = new List<string>();
 
             await ConnectAsyncCore(token);
-            // OnConnected?.Invoke();
             _messageReadLoop = MessageReadLoop();
             _messageSendLoop = MessageSendLoop();
             _joinLoop = JoinLoop();
@@ -140,6 +138,9 @@ namespace TwitchEbooks.Twitch.Chat
 
         private async Task ConnectAsyncCore(CancellationToken token = default)
         {
+            if (_tokenSource == null || _tokenSource.IsCancellationRequested)
+                _tokenSource = new CancellationTokenSource();
+
             using var comboToken = CancellationTokenSource.CreateLinkedTokenSource(_tokenSource.Token, token);
             await _client.ConnectAsync(_serverUri, comboToken.Token);
             await SendRawMessageAsync($"PASS oauth:{_accessToken}");
@@ -231,6 +232,7 @@ namespace TwitchEbooks.Twitch.Chat
 
             _logger?.LogInformation("Disconnected from Twitch");
             OnDisconnected?.Invoke(this, new OnDisconnectedEventArgs());
+            _tokenSource.Cancel();
         }
 
         private async Task MessageSendLoop()
