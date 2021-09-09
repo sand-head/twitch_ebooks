@@ -128,15 +128,9 @@ namespace TwitchEbooks.Twitch.Chat
             return await _incomingMessageQueue.Reader.ReadAsync(token);
         }
 
-        public void Disconnect()
-        {
-            _client.Abort();
-            OnDisconnected?.Invoke(this, new OnDisconnectedEventArgs());
-        }
-
         public void Dispose()
         {
-            Disconnect();
+            _client.Abort();
             _tokenSource.Cancel();
             Thread.Sleep(500);
             _tokenSource.Dispose();
@@ -173,7 +167,7 @@ namespace TwitchEbooks.Twitch.Chat
                 }
                 else if (result.MessageType == WebSocketMessageType.Close)
                 {
-                    Disconnect();
+                    break;
                 }
 
                 if (result.EndOfMessage)
@@ -211,7 +205,7 @@ namespace TwitchEbooks.Twitch.Chat
                             continue;
                         }
 
-                        _logger?.LogInformation("Received: {Message}", twitchMessage);
+                        _logger?.LogDebug("Received: {Message}", twitchMessage);
                         // do some fun things internally so consumers don't have to deal with them
                         if (twitchMessage is TwitchMessage.Ping ping)
                             await SendRawMessageAsync($"PONG :{ping.Server}");
@@ -235,6 +229,7 @@ namespace TwitchEbooks.Twitch.Chat
                 }
             }
 
+            _logger?.LogInformation("Disconnected from Twitch");
             OnDisconnected?.Invoke(this, new OnDisconnectedEventArgs());
         }
 
