@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
@@ -15,6 +16,12 @@ namespace TwitchEbooks
     {
         public static async Task Main(string[] args)
         {
+            var configuration = new ConfigurationBuilder()
+                .AddJsonFile("appsettings.json", optional: true)
+                //.AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}.json", optional: true)
+                .AddEnvironmentVariables()
+                .Build();
+
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Override("Microsoft.EntityFrameworkCore.Database.Command", LogEventLevel.Warning)
                 .Enrich.FromLogContext()
@@ -22,13 +29,14 @@ namespace TwitchEbooks
                     outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] <{SourceContext}> {Message:lj}{NewLine}{Exception}",
                     theme: AnsiConsoleTheme.Code,
                     applyThemeToRedirectedOutput: true)
+                .WriteTo.Seq(configuration.GetConnectionString("Seq"))
                 .CreateLogger();
             var logger = Log.ForContext<Program>();
 
             try
             {
                 logger.Information("Starting host...");
-                var host = CreateHostBuilder(args).Build();
+                var host = CreateHostBuilder(args, configuration).Build();
                 MigrateDatabase(host);
                 await StartWebHostIfFirstRunAsync(host);
                 await host.RunAsync();
@@ -43,7 +51,7 @@ namespace TwitchEbooks
             }
         }
 
-        public static IHostBuilder CreateHostBuilder(string[] args) =>
+        public static IHostBuilder CreateHostBuilder(string[] args, IConfiguration config) =>
             Host.CreateDefaultBuilder(args)
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
@@ -56,7 +64,8 @@ namespace TwitchEbooks
                     .WriteTo.Console(
                         outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] <{SourceContext}> {Message:lj}{NewLine}{Exception}",
                         theme: AnsiConsoleTheme.Code,
-                        applyThemeToRedirectedOutput: true));
+                        applyThemeToRedirectedOutput: true)
+                    .WriteTo.Seq(config.GetConnectionString("Seq")));
 
         static void MigrateDatabase(IHost host)
         {
