@@ -206,8 +206,7 @@ namespace TwitchEbooks.Twitch.Chat
                             continue;
                         }
 
-                        _logger?.LogDebug("Received {MessageType} message: {Message}",
-                            twitchMessage.GetType().Name, JsonExtensions.SerializeToElement(twitchMessage));
+                        _logger?.LogDebug("Received {MessageType} message: {@Message}", twitchMessage.GetType().Name, twitchMessage);
                         // do some fun things internally so consumers don't have to deal with them
                         if (twitchMessage is TwitchMessage.Ping ping)
                             await SendRawMessageAsync($"PONG :{ping.Server}");

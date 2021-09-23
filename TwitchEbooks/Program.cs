@@ -7,10 +7,8 @@ using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.SystemConsole.Themes;
 using System;
-using System.Text.Json;
 using System.Threading.Tasks;
 using TwitchEbooks.Database;
-using TwitchEbooks.Infrastructure;
 
 namespace TwitchEbooks
 {
@@ -62,7 +60,6 @@ namespace TwitchEbooks
                 .UseSerilog((context, services, configuration) => configuration
                     .ReadFrom.Configuration(context.Configuration)
                     .ReadFrom.Services(services)
-                    .Destructure.With<JsonElementDestructuringPolicy>()
                     .Enrich.FromLogContext()
                     .Enrich.WithProperty("Application", "TwitchEbooks")
                     .WriteTo.Console(
