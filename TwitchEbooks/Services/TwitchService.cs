@@ -85,7 +85,7 @@ namespace TwitchEbooks.Services
                             await TwitchClient_OnConnected();
                             break;
                         case TwitchMessage.Join join:
-                            _logger.LogDebug("{User} has joined channel {Channel}.", join.Username, join.Channel);
+                            _logger.LogDebug("User {UserName} has joined channel {ChannelName}.", join.Username, join.Channel);
                             break;
                         case TwitchMessage.Chat chat:
                             await TwitchClient_OnMessageReceived(chat);
@@ -98,6 +98,7 @@ namespace TwitchEbooks.Services
                             }
                             else
                             {
+                                _logger.LogInformation("Banning user {UserName} from channel {ChannelName}.", clearChat.User, clearChat.Channel);
                                 await _mediator.Send(new BanUserRequest(clearChat.Channel, clearChat.User), stoppingToken);
                             }
                             break;
@@ -108,13 +109,13 @@ namespace TwitchEbooks.Services
                             await TwitchClient_OnGiftedSubscription(giftSub);
                             break;
                         case TwitchMessage.Part part:
-                            _logger.LogDebug("{User} has left channel {Channel}.", part.Username, part.Channel);
+                            _logger.LogDebug("User {UserName} has left channel {ChannelName}.", part.Username, part.Channel);
                             break;
                     }
                 }
                 catch (Exception e)
                 {
-                    _logger.LogError("Exception caught in message read loop after receiving {MessageType}: {Exception}", message.GetType(), e);
+                    _logger.LogError(e, "Exception caught in message read loop after receiving {MessageType}.", message.GetType());
                 }
             }
 
@@ -130,7 +131,7 @@ namespace TwitchEbooks.Services
             var usersResponse = await api.GetUsersAsync(_tokens.AccessToken, _settings.ClientId, ids: context.Channels.Select(c => c.Id.ToString()).ToList());
             foreach (var user in usersResponse.Users)
             {
-                _logger.LogInformation("Joining channel {Name}...", user.Login);
+                _logger.LogInformation("Joining channel {ChannelName}...", user.Login);
                 await _client.JoinChannelAsync(user.Login);
             }
         }
@@ -189,7 +190,7 @@ namespace TwitchEbooks.Services
             // if the gift sub is to a channel we're in (and it's for the bot), send the celebratory messages
             if (_tokens.UserId == giftSub.RecipientId && _client.JoinedChannels.Contains(giftSub.Channel))
             {
-                _logger.LogInformation("We got gifted a subscription to channel {Id}!", giftSub.RoomId);
+                _logger.LogInformation("We got gifted a subscription to channel {ChannelId}!", giftSub.RoomId);
                 await _mediator.Send(new SendMessageRequest(giftSub.RoomId, $"🎉 Thanks for the gift sub @{giftSub.SenderDisplayName}! 🎉"));
                 await _mediator.Publish(new GenerateMessageNotification(giftSub.RoomId));
             }

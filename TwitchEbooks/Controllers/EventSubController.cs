@@ -29,10 +29,10 @@ namespace TwitchEbooks.Controllers
             if (!VerifyEventSubSignature(Request.Headers, body))
                 return StatusCode(403);
 
-            _logger.LogInformation("Received EventSub payload of type {Type} from Twitch.", messageType);
-            var jsonDoc = JsonDocument.Parse(body).RootElement;
+            _logger.LogInformation("Received EventSub payload of type {PayloadType} from Twitch.", messageType);
+            using var jsonDoc = JsonDocument.Parse(body);
             if (messageType == "webhook_callback_verification")
-                return Ok(jsonDoc.GetProperty("challenge").GetString());
+                return Ok(jsonDoc.RootElement.GetProperty("challenge").GetString());
 
             // put notification on queue for processing
             var payload = JsonSerializer.Deserialize<EventSubPayload>(body);

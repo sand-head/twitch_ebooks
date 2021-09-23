@@ -41,7 +41,7 @@ namespace TwitchEbooks.Handlers.Requests
             }
 
             await _client.SendChatMessageAsync(channelName, message, messageId, cancellationToken);
-            _logger.LogInformation("Sent message to channel {Id}.", channelId);
+            _logger.LogInformation("Sent message to channel {ChannelId}.", channelId);
             return Unit.Value;
         }
     }

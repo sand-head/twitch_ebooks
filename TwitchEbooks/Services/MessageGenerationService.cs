@@ -40,7 +40,7 @@ namespace TwitchEbooks.Infrastructure
             {
                 var (channelId, messageId) = await _queue.DequeueAsync(stoppingToken);
                 var message = await _chainService.GenerateMessageAsync(channelId, stoppingToken);
-                _logger.LogInformation("Generated message for channel {Id}.", channelId);
+                _logger.LogInformation("Generated message for channel {ChannelId}: {Message}", channelId, message);
                 await _mediator.Send(new SendMessageRequest(channelId, message, messageId), stoppingToken);
             }
         }

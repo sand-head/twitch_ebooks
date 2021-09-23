@@ -187,7 +187,7 @@ namespace TwitchEbooks.Twitch.Chat
                             // either the client is hooked up to fdgt (which has inconsistencies with Twitch's IRC interface)
                             // or something has unexpectedly changed in Twitch's responses due to an update
                             // either way, it's probably best to just log & continue here
-                            _logger?.LogInformation(e, "Could not parse property value out of string");
+                            _logger?.LogInformation(e, "Could not parse property value out of string.");
                             continue;
                         }
                         catch (Exception e)
@@ -196,7 +196,7 @@ namespace TwitchEbooks.Twitch.Chat
                             // 1. the message
                             // 2. the parser
                             // so let's log an error and continue
-                            _logger?.LogError(e, "An unhandled exception occurred when parsing message {Message}", message);
+                            _logger?.LogError(e, "An unhandled exception occurred when parsing message: {Message}", message);
                             continue;
                         }
 
@@ -206,7 +206,8 @@ namespace TwitchEbooks.Twitch.Chat
                             continue;
                         }
 
-                        _logger?.LogDebug("Received: {Message}", twitchMessage);
+                        _logger?.LogDebug("Received {MessageType} message: {Message}",
+                            twitchMessage.GetType().Name, JsonExtensions.SerializeToElement(twitchMessage));
                         // do some fun things internally so consumers don't have to deal with them
                         if (twitchMessage is TwitchMessage.Ping ping)
                             await SendRawMessageAsync($"PONG :{ping.Server}");
@@ -254,7 +255,7 @@ namespace TwitchEbooks.Twitch.Chat
             }
             catch (Exception e)
             {
-                _logger?.LogWarning("Exception occured in client message sending loop: {Message}", e.Message);
+                _logger?.LogWarning(e, "Exception occured in client message sending loop.");
             }
         }
 
@@ -273,7 +274,7 @@ namespace TwitchEbooks.Twitch.Chat
             }
             catch (Exception e)
             {
-                _logger?.LogWarning("Exception occured in client channel join loop: {Message}", e.Message);
+                _logger?.LogWarning(e, "Exception occured in client channel join loop.");
             }
         }
     }

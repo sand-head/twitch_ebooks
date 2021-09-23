@@ -35,7 +35,7 @@ namespace TwitchEbooks.Handlers.Notifications
             // ditch the bad messages
             context.Messages.RemoveRange(badMessages);
             var count = await context.SaveChangesAsync(cancellationToken);
-            _logger.LogInformation("Purged {Count} messages from channel {Id}.", count, channelId);
+            _logger.LogInformation("Purged {Count} messages from channel {ChannelId}.", count, channelId);
 
             // re-create the pool for the given channel
             await _chainService.AddChainForChannelAsync(channelId, cancellationToken);
