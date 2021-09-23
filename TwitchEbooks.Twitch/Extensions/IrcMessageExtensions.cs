@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using TwitchEbooks.Twitch.Chat.Messages;
 
 namespace TwitchEbooks.Twitch.Extensions
@@ -13,7 +14,10 @@ namespace TwitchEbooks.Twitch.Extensions
                 "375" => new TwitchMessage.MotdStart(),
                 "372" => new TwitchMessage.Motd(Message: ircMessage.Parameters[1]),
                 "376" => new TwitchMessage.EndOfMotd(),
-                "353" => new TwitchMessage.NameReply(Users: ircMessage.Parameters.ToArray()),
+                "353" => new TwitchMessage.NameReply(
+                    User: ircMessage.Parameters[0],
+                    Channel: ircMessage.Parameters[2][1..],
+                    Users: ircMessage.Parameters.Skip(3).ToArray()),
                 "366" => new TwitchMessage.EndOfNames(),
                 "421" => new TwitchMessage.UnknownCommand(Message: ircMessage.Parameters[0]),
                 "PING" => new TwitchMessage.Ping(Server: ircMessage.Parameters[0]),
