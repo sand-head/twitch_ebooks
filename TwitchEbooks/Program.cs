@@ -26,6 +26,7 @@ namespace TwitchEbooks
                 .MinimumLevel.Override("Microsoft.EntityFrameworkCore.Database.Command", LogEventLevel.Warning)
                 .Enrich.FromLogContext()
                 .WriteTo.Console(
+                    restrictedToMinimumLevel: LogEventLevel.Warning,
                     outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] <{SourceContext}> {Message:lj}{NewLine}{Exception}",
                     theme: AnsiConsoleTheme.Code,
                     applyThemeToRedirectedOutput: true)
