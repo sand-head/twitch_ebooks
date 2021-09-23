@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -39,9 +40,18 @@ namespace TwitchEbooks.Infrastructure
             while (!stoppingToken.IsCancellationRequested)
             {
                 var (channelId, messageId) = await _queue.DequeueAsync(stoppingToken);
-                var message = await _chainService.GenerateMessageAsync(channelId, stoppingToken);
-                _logger.LogInformation("Generated message for channel {ChannelId}: {Message}", channelId, message);
-                await _mediator.Send(new SendMessageRequest(channelId, message, messageId), stoppingToken);
+                using (_logger.BeginScope(new Dictionary<string, object>
+                {
+                    ["@TwitchMessage"] = new
+                    {
+                        Id = messageId
+                    }
+                }))
+                {
+                    var message = await _chainService.GenerateMessageAsync(channelId, stoppingToken);
+                    _logger.LogInformation("Generated message for channel {ChannelId}: {Message}", channelId, message);
+                    await _mediator.Send(new SendMessageRequest(channelId, message, messageId), stoppingToken);
+                }
             }
         }
 

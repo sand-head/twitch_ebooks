@@ -77,7 +77,7 @@ namespace TwitchEbooks.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 var message = await _client.ReadMessageAsync(stoppingToken);
-                using (_logger.BeginScope(new Dictionary<string, object>()
+                using (_logger.BeginScope(new Dictionary<string, object>
                 {
                     ["@TwitchMessage"] = message
                 }))
