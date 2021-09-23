@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -76,46 +77,52 @@ namespace TwitchEbooks.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 var message = await _client.ReadMessageAsync(stoppingToken);
-                try
+                using (_logger.BeginScope(new Dictionary<string, object>()
                 {
-                    switch (message)
+                    ["TwitchMessage"] = message
+                }))
+                {
+                    try
                     {
-                        case TwitchMessage.Welcome:
-                            _logger.LogInformation("Connected!");
-                            await TwitchClient_OnConnected();
-                            break;
-                        case TwitchMessage.Join join:
-                            _logger.LogDebug("User {UserName} has joined channel {ChannelName}.", join.Username, join.Channel);
-                            break;
-                        case TwitchMessage.Chat chat:
-                            await TwitchClient_OnMessageReceived(chat);
-                            break;
-                        case TwitchMessage.ClearChat clearChat:
-                            var channelId = await _userService.GetIdByUsername(clearChat.Channel);
-                            if (string.IsNullOrWhiteSpace(clearChat.User))
-                            {
-                                // todo: clear the entire channel's history
-                            }
-                            else
-                            {
-                                _logger.LogInformation("Banning user {UserName} from channel {ChannelName}.", clearChat.User, clearChat.Channel);
-                                await _mediator.Send(new BanUserRequest(clearChat.Channel, clearChat.User), stoppingToken);
-                            }
-                            break;
-                        case TwitchMessage.ClearMsg clearMsg:
-                            await _mediator.Send(new DeleteMessageNotification(clearMsg.TargetMessageId), stoppingToken);
-                            break;
-                        case TwitchMessage.GiftSub giftSub:
-                            await TwitchClient_OnGiftedSubscription(giftSub);
-                            break;
-                        case TwitchMessage.Part part:
-                            _logger.LogDebug("User {UserName} has left channel {ChannelName}.", part.Username, part.Channel);
-                            break;
+                        switch (message)
+                        {
+                            case TwitchMessage.Welcome:
+                                _logger.LogInformation("Connected!");
+                                await TwitchClient_OnConnected();
+                                break;
+                            case TwitchMessage.Join join:
+                                _logger.LogDebug("User {UserName} has joined channel {ChannelName}.", join.Username, join.Channel);
+                                break;
+                            case TwitchMessage.Chat chat:
+                                await TwitchClient_OnMessageReceived(chat);
+                                break;
+                            case TwitchMessage.ClearChat clearChat:
+                                var channelId = await _userService.GetIdByUsername(clearChat.Channel);
+                                if (string.IsNullOrWhiteSpace(clearChat.User))
+                                {
+                                    // todo: clear the entire channel's history
+                                }
+                                else
+                                {
+                                    _logger.LogInformation("Banning user {UserName} from channel {ChannelName}.", clearChat.User, clearChat.Channel);
+                                    await _mediator.Send(new BanUserRequest(clearChat.Channel, clearChat.User), stoppingToken);
+                                }
+                                break;
+                            case TwitchMessage.ClearMsg clearMsg:
+                                await _mediator.Send(new DeleteMessageNotification(clearMsg.TargetMessageId), stoppingToken);
+                                break;
+                            case TwitchMessage.GiftSub giftSub:
+                                await TwitchClient_OnGiftedSubscription(giftSub);
+                                break;
+                            case TwitchMessage.Part part:
+                                _logger.LogDebug("User {UserName} has left channel {ChannelName}.", part.Username, part.Channel);
+                                break;
+                        }
                     }
-                }
-                catch (Exception e)
-                {
-                    _logger.LogError(e, "Exception caught in message read loop after receiving {MessageType}.", message.GetType());
+                    catch (Exception e)
+                    {
+                        _logger.LogError(e, "Exception caught in message read loop after receiving {MessageType}.", message.GetType());
+                    }
                 }
             }
 
