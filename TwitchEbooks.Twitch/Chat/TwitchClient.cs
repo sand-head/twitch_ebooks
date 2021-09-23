@@ -176,9 +176,11 @@ namespace TwitchEbooks.Twitch.Chat
                     foreach (var message in messages.Trim().Replace("\r", string.Empty).Split('\n'))
                     {
                         TwitchMessage twitchMessage;
+                        IrcMessage ircMessage;
+
                         try
                         {
-                            twitchMessage = IrcMessageParser.TryParse(message, out var ircMessage)
+                            twitchMessage = IrcMessageParser.TryParse(message, out ircMessage)
                                 ? ircMessage.ToTwitchMessage()
                                 : null;
                         }
@@ -202,11 +204,11 @@ namespace TwitchEbooks.Twitch.Chat
 
                         if (twitchMessage is null)
                         {
-                            _logger?.LogInformation("Received unknown message: {Message}", message);
+                            _logger?.LogInformation("Received unknown message: {@IrcMessage}", ircMessage);
                             continue;
                         }
 
-                        _logger?.LogDebug("Received {MessageType} message: {@Message}", twitchMessage.GetType().Name, twitchMessage);
+                        _logger?.LogDebug("Received {MessageType} message: {@TwitchMessage}", twitchMessage.GetType().Name, twitchMessage);
                         // do some fun things internally so consumers don't have to deal with them
                         if (twitchMessage is TwitchMessage.Ping ping)
                             await SendRawMessageAsync($"PONG :{ping.Server}");
