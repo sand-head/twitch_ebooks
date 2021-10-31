@@ -154,87 +154,107 @@ namespace TwitchEbooks.Twitch.Chat
         {
             var messages = "";
             var shouldReconnect = false;
+            var closeReason = WebSocketCloseStatus.NormalClosure;
 
-            while (IsConnected && !_tokenSource.IsCancellationRequested)
+            try
             {
-                var buffer = new byte[1024];
-                var result = await _client.ReceiveAsync(new ArraySegment<byte>(buffer), _tokenSource.Token);
-
-                if (result is null || result.MessageType == WebSocketMessageType.Binary) continue;
-
-                if (result.MessageType == WebSocketMessageType.Text)
+                while (IsConnected && !_tokenSource.IsCancellationRequested)
                 {
-                    messages += Encoding.UTF8.GetString(buffer).TrimEnd('\0');
-                }
-                else if (result.MessageType == WebSocketMessageType.Close)
-                {
-                    break;
-                }
-
-                if (result.EndOfMessage)
-                {
-                    foreach (var message in messages.Trim().Replace("\r", string.Empty).Split('\n'))
+                    try
                     {
-                        TwitchMessage twitchMessage;
-                        IrcMessage ircMessage;
+                        var buffer = new byte[1024];
+                        var result = await _client.ReceiveAsync(new ArraySegment<byte>(buffer), _tokenSource.Token);
 
-                        try
+                        if (result is null || result.MessageType == WebSocketMessageType.Binary) continue;
+
+                        if (result.MessageType == WebSocketMessageType.Text)
                         {
-                            twitchMessage = IrcMessageParser.TryParse(message, out ircMessage)
-                                ? ircMessage.ToTwitchMessage()
-                                : null;
+                            messages += Encoding.UTF8.GetString(buffer).TrimEnd('\0');
                         }
-                        catch (FormatException e)
+                        else if (result.MessageType == WebSocketMessageType.Close)
                         {
-                            // either the client is hooked up to fdgt (which has inconsistencies with Twitch's IRC interface)
-                            // or something has unexpectedly changed in Twitch's responses due to an update
-                            // either way, it's probably best to just log & continue here
-                            _logger?.LogInformation(e, "Could not parse property value out of string.");
-                            continue;
-                        }
-                        catch (Exception e)
-                        {
-                            // if we get here there's something drastically wrong with either:
-                            // 1. the message
-                            // 2. the parser
-                            // so let's log an error and continue
-                            _logger?.LogError(e, "An unhandled exception occurred when parsing message: {Message}", message);
-                            continue;
+                            closeReason = result.CloseStatus.GetValueOrDefault();
+                            break;
                         }
 
-                        if (twitchMessage is null)
+                        if (result.EndOfMessage)
                         {
-                            _logger?.LogInformation("Received unknown message: {@IrcMessage}", ircMessage);
-                            continue;
+                            foreach (var message in messages.Trim().Replace("\r", string.Empty).Split('\n'))
+                            {
+                                TwitchMessage twitchMessage;
+                                IrcMessage ircMessage;
+
+                                try
+                                {
+                                    twitchMessage = IrcMessageParser.TryParse(message, out ircMessage)
+                                        ? ircMessage.ToTwitchMessage()
+                                        : null;
+                                }
+                                catch (FormatException e)
+                                {
+                                    // either the client is hooked up to fdgt (which has inconsistencies with Twitch's IRC interface)
+                                    // or something has unexpectedly changed in Twitch's responses due to an update
+                                    // either way, it's probably best to just log & continue here
+                                    _logger?.LogInformation(e, "Could not parse property value out of string.");
+                                    continue;
+                                }
+                                catch (Exception e)
+                                {
+                                    // if we get here there's something drastically wrong with either:
+                                    // 1. the message
+                                    // 2. the parser
+                                    // so let's log an error and continue
+                                    _logger?.LogError(e, "An unhandled exception occurred when parsing message: {Message}", message);
+                                    continue;
+                                }
+
+                                if (twitchMessage is null)
+                                {
+                                    _logger?.LogInformation("Received unknown message: {@IrcMessage}", ircMessage);
+                                    continue;
+                                }
+
+                                _logger?.LogDebug("Received {MessageType} message: {@TwitchMessage}", twitchMessage.GetType().Name, twitchMessage);
+                                // do some fun things internally so consumers don't have to deal with them
+                                if (twitchMessage is TwitchMessage.Ping ping)
+                                    await SendRawMessageAsync($"PONG :{ping.Server}");
+                                else if (twitchMessage is TwitchMessage.Join joinMsg && _username == joinMsg.Username)
+                                    _joinedChannels.Add(joinMsg.Channel);
+                                else if (twitchMessage is TwitchMessage.Part partMsg && _username == partMsg.Username)
+                                    _joinedChannels.Remove(partMsg.Channel);
+                                else if (twitchMessage is TwitchMessage.Reconnect)
+                                    shouldReconnect = true;
+
+                                await _incomingMessageQueue.Writer.WriteAsync(twitchMessage, _tokenSource.Token);
+                            }
+                            messages = "";
                         }
 
-                        _logger?.LogDebug("Received {MessageType} message: {@TwitchMessage}", twitchMessage.GetType().Name, twitchMessage);
-                        // do some fun things internally so consumers don't have to deal with them
-                        if (twitchMessage is TwitchMessage.Ping ping)
-                            await SendRawMessageAsync($"PONG :{ping.Server}");
-                        else if (twitchMessage is TwitchMessage.Join joinMsg && _username == joinMsg.Username)
-                            _joinedChannels.Add(joinMsg.Channel);
-                        else if (twitchMessage is TwitchMessage.Part partMsg && _username == partMsg.Username)
-                            _joinedChannels.Remove(partMsg.Channel);
-                        else if (twitchMessage is TwitchMessage.Reconnect)
-                            shouldReconnect = true;
-
-                        await _incomingMessageQueue.Writer.WriteAsync(twitchMessage, _tokenSource.Token);
+                        // reconnect if we've disconnected after twitch send a Reconnect message
+                        if (shouldReconnect && !IsConnected && !_tokenSource.IsCancellationRequested)
+                        {
+                            _logger?.LogInformation("Reconnecting to Twitch...");
+                            await ConnectAsyncCore();
+                        }
                     }
-                    messages = "";
-                }
-
-                // reconnect if we've disconnected after twitch send a Reconnect message
-                if (shouldReconnect && !IsConnected && !_tokenSource.IsCancellationRequested)
-                {
-                    _logger?.LogInformation("Reconnecting to Twitch...");
-                    await ConnectAsyncCore();
+                    catch (Exception e)
+                    {
+                        _logger.LogError(e, "An exception occurred while receiving messages from Twitch.");
+                        closeReason = WebSocketCloseStatus.InternalServerError;
+                    }
                 }
             }
-
-            _logger?.LogInformation("Disconnected from Twitch");
-            OnDisconnected?.Invoke(this, new OnDisconnectedEventArgs());
-            _tokenSource.Cancel();
+            catch (Exception e)
+            {
+                _logger.LogError(e, "An exception occurred while receiving messages from Twitch.");
+                closeReason = WebSocketCloseStatus.InternalServerError;
+            }
+            finally
+            {
+                _logger?.LogInformation("Disconnected from Twitch with reason {Reason}", closeReason);
+                OnDisconnected?.Invoke(this, new OnDisconnectedEventArgs());
+                _tokenSource.Cancel();
+            }
         }
 
         private async Task MessageSendLoop()
