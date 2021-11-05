@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
+using Serilog.Core;
 using Serilog.Events;
 using Serilog.Sinks.SystemConsole.Themes;
 using System;
@@ -14,6 +15,8 @@ namespace TwitchEbooks
 {
     public class Program
     {
+        private static LoggingLevelSwitch _levelSwitch = new();
+
         public static async Task Main(string[] args)
         {
             var configuration = new ConfigurationBuilder()
@@ -22,21 +25,8 @@ namespace TwitchEbooks
                 .AddEnvironmentVariables()
                 .Build();
 
-            Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Override("Microsoft.EntityFrameworkCore.Database.Command", LogEventLevel.Warning)
-                .Enrich.FromLogContext()
-                .WriteTo.Console(
-                    restrictedToMinimumLevel: LogEventLevel.Warning,
-                    outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] <{SourceContext}> {Message:lj}{NewLine}{Exception}",
-                    theme: AnsiConsoleTheme.Code,
-                    applyThemeToRedirectedOutput: true)
-                .WriteTo.Seq(configuration.GetConnectionString("Seq"))
-                .CreateLogger();
-            var logger = Log.ForContext<Program>();
-
             try
             {
-                logger.Information("Starting host...");
                 var host = CreateHostBuilder(args, configuration).Build();
                 MigrateDatabase(host);
                 await StartWebHostIfFirstRunAsync(host);
@@ -44,6 +34,7 @@ namespace TwitchEbooks
             }
             catch (Exception ex)
             {
+                var logger = Log.ForContext<Program>();
                 logger.Fatal(ex, "Host terminated unexpectedly.");
             }
             finally
@@ -59,15 +50,17 @@ namespace TwitchEbooks
                     webBuilder.UseStartup<Startup>();
                 })
                 .UseSerilog((context, services, configuration) => configuration
+                    .MinimumLevel.ControlledBy(_levelSwitch)
                     .ReadFrom.Configuration(context.Configuration)
                     .ReadFrom.Services(services)
                     .Enrich.FromLogContext()
-                    .Enrich.WithProperty("Application", "TwitchEbooks")
                     .WriteTo.Console(
                         outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] <{SourceContext}> {Message:lj}{NewLine}{Exception}",
                         theme: AnsiConsoleTheme.Code,
                         applyThemeToRedirectedOutput: true)
-                    .WriteTo.Seq(config.GetConnectionString("Seq")));
+                    .WriteTo.Seq(config.GetConnectionString("Seq"),
+                        apiKey: config.GetValue<string>("SeqApiKey"),
+                        controlLevelSwitch: _levelSwitch));
 
         static void MigrateDatabase(IHost host)
         {
