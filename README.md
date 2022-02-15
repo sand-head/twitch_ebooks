@@ -1,5 +1,5 @@
 # twitch_ebooks
-[![Matrix](https://img.shields.io/matrix/twitch_ebooks:schweigert.dev?server_fqdn=schweigert.dev&style=flat-square)](https://matrix.to/#/#twitch_ebooks:schweigert.dev)
+[![Matrix](https://img.shields.io/matrix/twitch_ebooks:schweigert.dev?server_fqdn=matrix.schweigert.dev&style=flat-square)](https://matrix.to/#/#twitch_ebooks:schweigert.dev)
 
 A Markov chain bot for Twitch.
 
